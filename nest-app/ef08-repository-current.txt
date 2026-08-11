@@ -1,0 +1,153 @@
+﻿import { Injectable } from '@nestjs/common';
+import { SupabaseService } from '../../../common/supabase/supabase.service';
+import {
+  SavedVideoConceptVersion,
+  SaveVideoConceptInput,
+  VideoConceptRepository,
+  VideoConceptSources,
+} from '../domain/repositories/video-concept.repository';
+
+@Injectable()
+export class SupabaseVideoConceptRepository extends VideoConceptRepository {
+  constructor(private readonly supabase: SupabaseService) {
+    super();
+  }
+
+  async loadSources(contentUuid: string): Promise<VideoConceptSources> {
+    const [
+      content,
+      context,
+      lyrics,
+      musicSpec,
+      compositionPlan,
+      providerPackage,
+      audioGeneration,
+      audioReview,
+    ] = await Promise.all([
+      this.one('geef_contents', 'id', contentUuid),
+      this.latest('geef_project_contexts', contentUuid),
+      this.latest('geef_project_lyrics', contentUuid),
+      this.latest('content_music_specs', contentUuid),
+      this.currentGeneration(contentUuid, 'COMPOSITION_PLAN'),
+      this.currentGeneration(contentUuid, 'PROVIDER_PACKAGE'),
+      this.latestCompletedAudio(contentUuid),
+      this.approvedReview(contentUuid),
+    ]);
+
+    return {
+      content,
+      context,
+      lyrics,
+      musicSpec,
+      compositionPlan,
+      providerPackage,
+      audioGeneration,
+      audioReview,
+    };
+  }
+
+  async saveVersion(input: SaveVideoConceptInput): Promise<SavedVideoConceptVersion> {
+    const result = await this.supabase.rpc('geef_save_video_concept_version', {
+      p_content_uuid: input.contentUuid,
+      p_module_run_id: input.moduleRunId,
+      p_provider: input.provider,
+      p_model_name: input.modelName,
+      p_prompt_text: input.promptText,
+      p_prompt_hash: input.promptHash,
+      p_parameters: input.parameters,
+      p_result_payload: input.resultPayload,
+    });
+    const row = Array.isArray(result) ? result[0] : result;
+    if (!row || typeof row !== 'object') {
+      throw new Error('EF-08 save RPC returned no row');
+    }
+    const value = row as Record<string, unknown>;
+    return {
+      generationId: String(value.generation_id),
+      versionNo: Number(value.version_no),
+      isCurrent: Boolean(value.is_current),
+      createdAt: String(value.created_at),
+    };
+  }
+
+  private async one(
+    table: string,
+    key: string,
+    value: string,
+  ): Promise<Record<string, unknown>> {
+    const response = await this.supabase.db
+      .from(table)
+      .select('*')
+      .eq(key, value)
+      .maybeSingle();
+    if (response.error || !response.data) {
+      throw new Error(`${table} source not found: ${response.error?.message ?? value}`);
+    }
+    return response.data as Record<string, unknown>;
+  }
+
+  private async latest(
+    table: string,
+    contentUuid: string,
+  ): Promise<Record<string, unknown>> {
+    const response = await this.supabase.db
+      .from(table)
+      .select('*')
+      .eq('content_uuid', contentUuid)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (response.error || !response.data) {
+      throw new Error(`${table} source not found: ${response.error?.message ?? contentUuid}`);
+    }
+    return response.data as Record<string, unknown>;
+  }
+
+  private async currentGeneration(
+    contentUuid: string,
+    generationType: string,
+  ): Promise<Record<string, unknown>> {
+    const response = await this.supabase.db
+      .from('geef_generation_versions')
+      .select('*')
+      .eq('content_uuid', contentUuid)
+      .eq('generation_type', generationType)
+      .eq('is_current', true)
+      .maybeSingle();
+    if (response.error || !response.data) {
+      throw new Error(`${generationType} current generation not found: ${response.error?.message ?? contentUuid}`);
+    }
+    return response.data as Record<string, unknown>;
+  }
+
+  private async latestCompletedAudio(contentUuid: string): Promise<Record<string, unknown>> {
+    const response = await this.supabase.db
+      .from('project_audio_generations')
+      .select('*')
+      .eq('content_uuid', contentUuid)
+      .eq('generation_status', 'COMPLETED')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (response.error || !response.data) {
+      throw new Error(`EF-06 COMPLETED audio not found: ${response.error?.message ?? contentUuid}`);
+    }
+    return response.data as Record<string, unknown>;
+  }
+
+  private async approvedReview(contentUuid: string): Promise<Record<string, unknown>> {
+    const response = await this.supabase.db
+      .from('geef_reviews')
+      .select('*')
+      .eq('content_uuid', contentUuid)
+      .eq('decision', 'APPROVED')
+      .order('review_round', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (response.error || !response.data) {
+      throw new Error(`EF-07 APPROVED review not found: ${response.error?.message ?? contentUuid}`);
+    }
+    return response.data as Record<string, unknown>;
+  }
+}
+

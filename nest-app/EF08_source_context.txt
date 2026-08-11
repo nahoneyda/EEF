@@ -1,0 +1,1868 @@
+﻿
+===== src\common\worker\executor.registry.ts =====
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+
+import { ModuleExecutor } from './module-executor.interface';
+
+export const EF01_EXECUTOR = Symbol('EF01_EXECUTOR');
+export const EF02_EXECUTOR = Symbol('EF02_EXECUTOR');
+export const EF03_EXECUTOR = Symbol('EF03_EXECUTOR');
+export const EF04_EXECUTOR = Symbol('EF04_EXECUTOR');
+export const EF05_EXECUTOR = Symbol('EF05_EXECUTOR');
+export const EF06_EXECUTOR = Symbol('EF06_EXECUTOR');
+export const EF07_EXECUTOR = Symbol('EF07_EXECUTOR');
+
+@Injectable()
+export class ExecutorRegistry implements OnModuleInit {
+  private readonly executors = new Map<string, ModuleExecutor>();
+
+  constructor(
+    @Inject(EF01_EXECUTOR)
+    private readonly ef01Executor: ModuleExecutor,
+
+    @Inject(EF02_EXECUTOR)
+    private readonly ef02Executor: ModuleExecutor,
+
+    @Inject(EF03_EXECUTOR)
+    private readonly ef03Executor: ModuleExecutor,
+
+    @Inject(EF04_EXECUTOR)
+    private readonly ef04Executor: ModuleExecutor,
+
+    @Inject(EF05_EXECUTOR)
+    private readonly ef05Executor: ModuleExecutor,
+
+    @Inject(EF06_EXECUTOR)
+    private readonly ef06Executor: ModuleExecutor,
+
+    @Inject(EF07_EXECUTOR)
+    private readonly ef07Executor: ModuleExecutor,
+  ) {}
+
+  onModuleInit(): void {
+    [
+      this.ef01Executor,
+      this.ef02Executor,
+      this.ef03Executor,
+      this.ef04Executor,
+      this.ef05Executor,
+      this.ef06Executor,
+      this.ef07Executor,
+    ].forEach((executor) => this.register(executor));
+  }
+
+  register(executor: ModuleExecutor): void {
+    if (this.executors.has(executor.moduleCode)) {
+      throw new Error(
+        `Duplicate executor registration: ${executor.moduleCode}`,
+      );
+    }
+
+    this.executors.set(executor.moduleCode, executor);
+  }
+
+  get(moduleCode: string): ModuleExecutor {
+    const executor = this.executors.get(moduleCode);
+
+    if (!executor) {
+      throw new Error(`Executor not found: ${moduleCode}`);
+    }
+
+    return executor;
+  }
+
+  has(moduleCode: string): boolean {
+    return this.executors.has(moduleCode);
+  }  
+}
+
+===== src\common\worker\module-executor.interface.ts =====
+export interface ModuleExecutionJob {
+  moduleCode: string;
+
+  contentUuid: string;
+
+  workflowRunId: string;
+
+  moduleRunId: string;
+
+  inputPayload?: Record<string, unknown>;
+}
+
+export interface ModuleExecutionResult {
+  moduleCode: string;
+
+  status: 'SUCCEEDED' | 'FAILED';
+
+  output?: Record<string, unknown>;
+}
+
+export abstract class ModuleExecutor {
+  abstract readonly moduleCode: string;
+
+  abstract execute(job: ModuleExecutionJob): Promise<ModuleExecutionResult>;
+}
+
+
+===== src\common\worker\worker.module.ts =====
+import { Module } from '@nestjs/common';
+
+import { WorkflowModule } from '../workflow/workflow.module';
+
+import { Ef01ContextExecutor } from '../../modules/ef01-context/application/executors/ef01-context.executor';
+import { Ef01ContextModule } from '../../modules/ef01-context/module/ef01-context.module';
+
+import { Ef02LyricsExecutor } from '../../modules/ef02-lyrics/application/executors/ef02-lyrics.executor';
+import { Ef02LyricsModule } from '../../modules/ef02-lyrics/module/ef02-lyrics.module';
+
+import { Ef03MusicSpecExecutor } from '../../modules/ef03-music-spec/application/executors/ef03-music-spec.executor';
+import { Ef03MusicSpecModule } from '../../modules/ef03-music-spec/module/ef03-music-spec.module';
+
+import { Ef04CompositionPlanExecutor } from '../../modules/ef04-composition-plan/application/executors/ef04-composition-plan.executor';
+import { Ef04CompositionPlanModule } from '../../modules/ef04-composition-plan/module/ef04-composition-plan.module';
+
+import { Ef05ProviderPackageExecutor } from '../../modules/ef05-provider-package/application/executors/ef05-provider-package.executor';
+import { Ef05ProviderPackageModule } from '../../modules/ef05-provider-package/module/ef05-provider-package.module';
+
+import { Ef06AudioGenerationExecutor } from '../../modules/ef06-audio-generation/application/executors/ef06-audio-generation.executor';
+import { Ef06AudioGenerationModule } from '../../modules/ef06-audio-generation/module/ef06-audio-generation.module';
+
+import { Ef07AudioQcExecutor } from '../../modules/ef07-audio-qc/application/executors/ef07-audio-qc.executor';
+import { Ef07AudioQcModule } from '../../modules/ef07-audio-qc/module/ef07-audio-qc.module';
+
+import {
+  EF01_EXECUTOR,
+  EF02_EXECUTOR,
+  EF03_EXECUTOR,
+  EF04_EXECUTOR,
+  EF05_EXECUTOR,
+  EF06_EXECUTOR,
+  EF07_EXECUTOR,
+  ExecutorRegistry,
+} from './executor.registry';
+
+import { WorkerController } from './worker.controller';
+import { WorkerService } from './worker.service';
+
+@Module({
+  imports: [
+    WorkflowModule,
+    Ef01ContextModule,
+    Ef02LyricsModule,
+    Ef03MusicSpecModule,
+    Ef04CompositionPlanModule,
+    Ef05ProviderPackageModule,
+    Ef06AudioGenerationModule,
+    Ef07AudioQcModule,
+  ],
+  controllers: [WorkerController],
+  providers: [
+    Ef01ContextExecutor,
+    Ef02LyricsExecutor,
+    Ef03MusicSpecExecutor,
+    Ef04CompositionPlanExecutor,
+    Ef05ProviderPackageExecutor,
+    Ef06AudioGenerationExecutor,
+    Ef07AudioQcExecutor,
+
+    {
+      provide: EF01_EXECUTOR,
+      useExisting: Ef01ContextExecutor,
+    },
+    {
+      provide: EF02_EXECUTOR,
+      useExisting: Ef02LyricsExecutor,
+    },
+    {
+      provide: EF03_EXECUTOR,
+      useExisting: Ef03MusicSpecExecutor,
+    },
+    {
+      provide: EF04_EXECUTOR,
+      useExisting: Ef04CompositionPlanExecutor,
+    },
+    {
+      provide: EF05_EXECUTOR,
+      useExisting: Ef05ProviderPackageExecutor,
+    },
+    {
+      provide: EF06_EXECUTOR,
+      useExisting: Ef06AudioGenerationExecutor,
+    },
+    {
+      provide: EF07_EXECUTOR,
+      useExisting: Ef07AudioQcExecutor,
+    },
+
+    ExecutorRegistry,
+    WorkerService,
+  ],
+  exports: [WorkerService, ExecutorRegistry],
+})
+export class WorkerModule {}
+
+===== src\common\worker\worker.service.ts =====
+import { Injectable, Logger } from '@nestjs/common';
+
+import { WorkflowService } from '../workflow/workflow.service';
+
+import { ExecutorRegistry } from './executor.registry';
+
+import {
+  ModuleExecutionJob,
+  ModuleExecutionResult,
+} from './module-executor.interface';
+
+export interface RunNextResult {
+  found: boolean;
+
+  workflowRunId: string;
+
+  moduleCode?: string;
+
+  moduleRunId?: string;
+
+  result?: ModuleExecutionResult;
+}
+
+@Injectable()
+export class WorkerService {
+  private readonly logger = new Logger(WorkerService.name);
+
+  constructor(
+    private readonly workflowService: WorkflowService,
+
+    private readonly registry: ExecutorRegistry,
+  ) {}
+
+  /**
+   * ?대? ?뺣낫??Job???ㅽ뻾?⑸땲??
+   */
+  async execute(job: ModuleExecutionJob): Promise<ModuleExecutionResult> {
+    this.logger.log(
+      [
+        'Worker execute',
+        `module=${job.moduleCode}`,
+        `moduleRunId=${job.moduleRunId}`,
+        `workflowRunId=${job.workflowRunId}`,
+      ].join(' '),
+    );
+
+    const executor = this.registry.get(job.moduleCode);
+
+    return executor.execute(job);
+  }
+
+  /**
+   * Workflow?먯꽌 ?ㅼ쓬 QUEUED 紐⑤뱢??議고쉶?섍퀬 ?ㅽ뻾?⑸땲??
+   */
+  async runNext(workflowRunId: string): Promise<RunNextResult> {
+    this.logger.log(`Finding next module: workflowRunId=${workflowRunId}`);
+
+    const queued =
+      await this.workflowService.getNextQueuedModule(workflowRunId);
+
+    if (!queued) {
+      return {
+        found: false,
+        workflowRunId,
+      };
+    }
+
+    this.logger.log(
+      [
+        'Queued module found',
+        `module=${queued.moduleCode}`,
+        `moduleRunId=${queued.moduleRunId}`,
+      ].join(' '),
+    );
+
+    const result = await this.execute({
+      moduleCode: queued.moduleCode,
+
+      contentUuid: queued.contentUuid,
+
+      workflowRunId: queued.workflowRunId,
+
+      moduleRunId: queued.moduleRunId,
+
+      inputPayload: queued.inputPayload,
+    });
+
+    return {
+      found: true,
+
+      workflowRunId: queued.workflowRunId,
+
+      moduleCode: queued.moduleCode,
+
+      moduleRunId: queued.moduleRunId,
+
+      result,
+    };
+  }
+}
+
+
+===== src\common\workflow\module-run\module-run.service.ts =====
+import { Injectable, Logger } from '@nestjs/common';
+
+import { ConfigService } from '@nestjs/config';
+
+import { SupabaseService } from '../../supabase/supabase.service';
+
+@Injectable()
+export class ModuleRunService {
+  private readonly logger = new Logger(ModuleRunService.name);
+
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  private firstRow<T>(value: T | T[] | null): T | null {
+    if (Array.isArray(value)) {
+      return value.length > 0 ? value[0] : null;
+    }
+
+    return value;
+  }
+
+  async beginModule(moduleRunId: string): Promise<unknown> {
+    const executionId =
+      this.configService.get<string>('WORKER_ID') ?? 'geef-nest-worker';
+
+    const rpcName =
+      this.configService.get<string>('RPC_BEGIN_MODULE') ?? 'geef_begin_module';
+
+    this.logger.log(`Beginning module: ${moduleRunId}`);
+
+    const result = await this.supabaseService.rpc(rpcName, {
+      p_module_run_id: moduleRunId,
+
+      p_make_execution_id: executionId,
+    });
+
+    return this.firstRow(result);
+  }
+
+  async finishModule(
+    moduleRunId: string,
+    success: boolean,
+    outputPayload: Record<string, unknown>,
+    errorCode: string | null = null,
+    errorMessage: string | null = null,
+  ): Promise<unknown> {
+    const rpcName =
+      this.configService.get<string>('RPC_FINISH_MODULE') ??
+      'geef_finish_module';
+
+    this.logger.log(`Finishing module: ${moduleRunId} success=${success}`);
+
+    const result = await this.supabaseService.rpc(rpcName, {
+      p_module_run_id: moduleRunId,
+
+      p_succeeded: success,
+
+      p_output_payload: outputPayload,
+
+      p_error_code: errorCode,
+
+      p_error_message: errorMessage,
+    });
+
+    return this.firstRow(result);
+  }
+}
+
+
+===== src\common\ai\google-ai.service.ts =====
+import {
+  Injectable,
+  Logger,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+
+export interface GenerateStructuredJsonInput {
+  model: string;
+  systemInstruction: string;
+  prompt: string;
+  responseJsonSchema: Record<string, unknown>;
+  maxOutputTokens?: number;
+}
+
+export interface GoogleGenerationInfo {
+  provider: 'google';
+  model: string;
+  usage: Record<string, unknown>;
+  promptFeedback: Record<string, unknown>;
+}
+
+export interface GenerateStructuredJsonResult {
+  data: Record<string, unknown>;
+  generationInfo: GoogleGenerationInfo;
+  raw: Record<string, unknown>;
+}
+
+@Injectable()
+export class GoogleAiService {
+  private readonly logger =
+    new Logger(GoogleAiService.name);
+
+  constructor(
+    private readonly config: ConfigService,
+  ) {}
+
+  async generateStructuredJson(
+    input: GenerateStructuredJsonInput,
+  ): Promise<GenerateStructuredJsonResult> {
+    const apiKey =
+      this.config.get<string>('GEMINI_API_KEY') ??
+      this.config.get<string>('GOOGLE_API_KEY');
+
+    if (!apiKey) {
+      throw new Error(
+        'GEMINI_API_KEY or GOOGLE_API_KEY is required',
+      );
+    }
+
+    const timeoutMs =
+      Number(
+        this.config.get<string>(
+          'GEMINI_TIMEOUT_SECONDS',
+        ) ?? '180',
+      ) * 1000;
+
+    const controller = new AbortController();
+    const timeout =
+      setTimeout(
+        () => controller.abort(),
+        timeoutMs,
+      );
+
+    try {
+      const url =
+        'https://generativelanguage.googleapis.com/' +
+        `v1beta/models/${encodeURIComponent(input.model)}` +
+        ':generateContent';
+
+      this.logger.log(
+        `Google AI request model=${input.model}`,
+      );
+
+      const response =
+        await fetch(url, {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            'x-goog-api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [
+                {
+                  text: input.systemInstruction,
+                },
+              ],
+            },
+            contents: [
+              {
+                role: 'user',
+                parts: [
+                  {
+                    text: input.prompt,
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              responseJsonSchema:
+                input.responseJsonSchema,
+              maxOutputTokens:
+                input.maxOutputTokens ?? 8192,
+            },
+          }),
+        });
+
+      const responseText =
+        await response.text();
+
+      if (!response.ok) {
+        throw new Error(
+          [
+            'Google generateContent failed',
+            `status=${response.status}`,
+            responseText.substring(0, 1500),
+          ].join(' '),
+        );
+      }
+
+      let payload: Record<string, unknown>;
+
+      try {
+        payload =
+          JSON.parse(responseText) as Record<string, unknown>;
+      } catch {
+        throw new Error(
+          'Google AI response was not valid JSON',
+        );
+      }
+
+      const promptFeedback =
+        this.objectValue(payload.promptFeedback);
+
+      const blockReason =
+        promptFeedback.blockReason;
+
+      if (
+        typeof blockReason === 'string' &&
+        blockReason
+      ) {
+        throw new Error(
+          `Google AI blocked prompt: ${blockReason}`,
+        );
+      }
+
+      const outputText =
+        this.extractOutputText(payload);
+
+      let generated: Record<string, unknown>;
+
+      try {
+        generated =
+          JSON.parse(outputText) as Record<string, unknown>;
+      } catch {
+        throw new Error(
+          'Google AI generated output was not valid JSON',
+        );
+      }
+
+      const model =
+        typeof payload.modelVersion === 'string'
+          ? payload.modelVersion
+          : input.model;
+
+      return {
+        data: generated,
+        generationInfo: {
+          provider: 'google',
+          model,
+          usage:
+            this.objectValue(payload.usageMetadata),
+          promptFeedback,
+        },
+        raw: payload,
+      };
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.name === 'AbortError'
+      ) {
+        throw new Error(
+          `Google AI request timeout after ${timeoutMs}ms`,
+        );
+      }
+
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private extractOutputText(
+    payload: Record<string, unknown>,
+  ): string {
+    const candidates = payload.candidates;
+
+    if (!Array.isArray(candidates)) {
+      throw new Error(
+        'Google AI response has no candidates',
+      );
+    }
+
+    for (const candidate of candidates) {
+      const candidateObject =
+        this.objectValue(candidate);
+
+      const content =
+        this.objectValue(candidateObject.content);
+
+      const parts = content.parts;
+
+      if (!Array.isArray(parts)) {
+        continue;
+      }
+
+      for (const part of parts) {
+        const partObject =
+          this.objectValue(part);
+
+        if (
+          typeof partObject.text === 'string' &&
+          partObject.text.trim()
+        ) {
+          return partObject.text;
+        }
+      }
+    }
+
+    throw new Error(
+      'Google AI response did not contain output text',
+    );
+  }
+
+  private objectValue(
+    value: unknown,
+  ): Record<string, unknown> {
+    if (
+      value &&
+      typeof value === 'object' &&
+      !Array.isArray(value)
+    ) {
+      return value as Record<string, unknown>;
+    }
+
+    return {};
+  }
+}
+
+
+===== src\common\ai\model-registry.service.ts =====
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+
+export type GeefRunMode = 'TEST' | 'PRODUCTION';
+
+export interface GoogleModelRegistry {
+  lyrics: string;
+  music: string;
+  image: string;
+  video: string;
+}
+
+@Injectable()
+export class ModelRegistryService {
+  constructor(
+    private readonly config: ConfigService,
+  ) {}
+
+  getGoogleModels(
+    runMode: string = 'TEST',
+  ): GoogleModelRegistry {
+    const mode = String(runMode).trim().toUpperCase();
+    const production = mode === 'PRODUCTION';
+
+    return {
+      lyrics:
+        this.config.get<string>(
+          production
+            ? 'GEMINI_LYRICS_MODEL_PRODUCTION'
+            : 'GEMINI_LYRICS_MODEL_TEST',
+        ) ??
+        (production
+          ? 'gemini-3.5-flash'
+          : 'gemini-3.5-flash-lite'),
+
+      music:
+        this.config.get<string>(
+          production
+            ? 'LYRIA_MODEL_PRODUCTION'
+            : 'LYRIA_MODEL_TEST',
+        ) ??
+        (production
+          ? 'lyria-3-pro-preview'
+          : 'lyria-3-clip-preview'),
+
+      image:
+        this.config.get<string>(
+          production
+            ? 'IMAGE_MODEL_PRODUCTION'
+            : 'IMAGE_MODEL_TEST',
+        ) ??
+        (production
+          ? 'gemini-3-pro-image'
+          : 'gemini-3.1-flash-lite-image'),
+
+      video:
+        this.config.get<string>(
+          production
+            ? 'VIDEO_MODEL_PRODUCTION'
+            : 'VIDEO_MODEL_TEST',
+        ) ??
+        (production
+          ? 'veo-3.1-generate-preview'
+          : 'veo-3.1-lite-generate-preview'),
+    };
+  }
+}
+
+
+===== src\common\ai\ai.module.ts =====
+import {
+  Global,
+  Module,
+} from '@nestjs/common';
+
+import { GoogleAiService } from './google-ai.service';
+import { ModelRegistryService } from './model-registry.service';
+
+@Global()
+@Module({
+  providers: [
+    GoogleAiService,
+    ModelRegistryService,
+  ],
+  exports: [
+    GoogleAiService,
+    ModelRegistryService,
+  ],
+})
+export class AiModule {}
+
+
+===== src\modules\ef07-audio-qc\application\executors\ef07-audio-qc.executor.ts =====
+import { Injectable } from '@nestjs/common';
+import { ModuleExecutionJob, ModuleExecutionResult, ModuleExecutor } from '../../../../common/worker/module-executor.interface';
+import { ReviewAudioUseCase } from '../use-cases/review-audio.use-case';
+
+@Injectable()
+export class Ef07AudioQcExecutor extends ModuleExecutor {
+  readonly moduleCode = 'EF-07';
+  constructor(private readonly useCase: ReviewAudioUseCase) { super(); }
+  async execute(job: ModuleExecutionJob): Promise<ModuleExecutionResult> {
+    const result = await this.useCase.execute({
+      contentUuid: job.contentUuid,
+      workflowRunId: job.workflowRunId,
+      moduleRunId: job.moduleRunId,
+      runMode: typeof job.inputPayload?.run_mode === 'string' ? job.inputPayload.run_mode : 'TEST',
+    });
+    return { moduleCode: this.moduleCode, status: 'SUCCEEDED', output: result };
+  }
+}
+
+
+===== src\modules\ef07-audio-qc\application\use-cases\review-audio.use-case.ts =====
+import { Injectable } from '@nestjs/common';
+import { mkdtemp, writeFile, rm } from 'fs/promises';
+import { tmpdir } from 'os';
+import { extname, join } from 'path';
+import { ModuleRunService } from '../../../../common/workflow/module-run/module-run.service';
+import { EventBusService } from '../../../../common/events/event-bus.service';
+import { AudioReviewedEvent } from '../../../../common/events/events/audio-reviewed.event';
+import { AudioReviewRepository } from '../../domain/repositories/audio-review.repository';
+import { AudioAnalyzer } from '../../domain/services/audio-analyzer.service';
+import { AudioQcPolicy } from '../../domain/services/audio-qc-policy.service';
+
+@Injectable()
+export class ReviewAudioUseCase {
+  constructor(
+    private readonly repo: AudioReviewRepository,
+    private readonly analyzer: AudioAnalyzer,
+    private readonly policy: AudioQcPolicy,
+    private readonly moduleRun: ModuleRunService,
+    private readonly events: EventBusService,
+  ) {}
+
+  async execute(req: { contentUuid: string; workflowRunId: string; moduleRunId: string; runMode?: string }) {
+    await this.moduleRun.beginModule(req.moduleRunId);
+    const runMode = (req.runMode ?? 'TEST').trim().toUpperCase();
+    let tempDirectory: string | undefined;
+    try {
+      const source = await this.repo.getLatestCompletedAudio(req.contentUuid);
+      const audio = await this.repo.downloadAudio(source);
+      tempDirectory = await mkdtemp(join(tmpdir(), 'ef07-'));
+      const extension = extname(source.storagePath) || `.${source.format ?? 'mp3'}`;
+      const localPath = join(tempDirectory, `audio${extension}`);
+      await writeFile(localPath, audio);
+      const analysis = await this.analyzer.analyze(localPath);
+      const result = this.policy.evaluate(analysis, source, runMode);
+      const review = await this.repo.upsertAutomaticReview({ contentUuid: req.contentUuid, result, analysis, source, runMode });
+      const output = {
+        module_code: 'EF-07', content_uuid: req.contentUuid, workflow_run_id: req.workflowRunId,
+        module_run_id: req.moduleRunId, review_id: review.id, review_round: 1,
+        decision: result.decision, score: result.score, generation_id: source.id,
+        issue_count: result.issues.length, run_mode: runMode,
+      };
+      await this.moduleRun.finishModule(req.moduleRunId, true, output, null, null);
+      await this.events.publish(new AudioReviewedEvent(req.workflowRunId, req.moduleRunId, req.contentUuid, {
+        reviewId: review.id, reviewRound: 1, decision: result.decision,
+        score: result.score, generationId: source.id,
+      }));
+      return { ...output, analysis, issues: result.issues };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      try {
+        const review = await this.repo.upsertFatalReview({
+          contentUuid: req.contentUuid,
+          runMode,
+          errorCode: 'EF07_AUDIO_UNAVAILABLE_OR_UNREADABLE',
+          errorMessage: message.slice(0, 2000),
+        });
+        const output = {
+          module_code: 'EF-07', content_uuid: req.contentUuid, workflow_run_id: req.workflowRunId,
+          module_run_id: req.moduleRunId, review_id: review.id, review_round: 1,
+          decision: 'REJECTED' as const, score: 0, run_mode: runMode,
+          error_code: 'EF07_AUDIO_UNAVAILABLE_OR_UNREADABLE',
+        };
+        await this.moduleRun.finishModule(req.moduleRunId, true, output, null, null);
+        await this.events.publish(new AudioReviewedEvent(req.workflowRunId, req.moduleRunId, req.contentUuid, {
+          reviewId: review.id, reviewRound: 1, decision: 'REJECTED', score: 0, generationId: 'unavailable',
+        }));
+        return output;
+      } catch (saveError) {
+        const saveMessage = saveError instanceof Error ? saveError.message : String(saveError);
+        try {
+          await this.moduleRun.finishModule(req.moduleRunId, false, {
+            module_code: 'EF-07', content_uuid: req.contentUuid, workflow_run_id: req.workflowRunId,
+            module_run_id: req.moduleRunId, decision: 'REJECTED', run_mode: runMode,
+          }, 'EF07_AUDIO_QC_FAILED', `${message}; ${saveMessage}`.slice(0, 2000));
+        } catch {}
+        throw saveError;
+      }
+    } finally {
+      if (tempDirectory) await rm(tempDirectory, { recursive: true, force: true });
+    }
+  }
+}
+
+
+===== src\modules\ef07-audio-qc\infrastructure\supabase-audio-review.repository.ts =====
+import { Injectable } from '@nestjs/common';
+import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { AudioReviewRepository } from '../domain/repositories/audio-review.repository';
+import {
+  AudioGenerationSource,
+  AudioQcResult,
+  AudioTechnicalAnalysis,
+  SavedReview,
+} from '../domain/entities/audio-review.entity';
+
+@Injectable()
+export class SupabaseAudioReviewRepository extends AudioReviewRepository {
+  constructor(private readonly supabase: SupabaseService) {
+    super();
+  }
+
+  async getLatestCompletedAudio(contentUuid: string): Promise<AudioGenerationSource> {
+    const { data, error } = await this.supabase.db
+      .from('project_audio_generations')
+      .select('*')
+      .eq('content_uuid', contentUuid)
+      .eq('generation_status', 'COMPLETED')
+      .not('audio_storage_bucket', 'is', null)
+      .not('audio_storage_path', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data)
+      throw new Error(`EF-06 COMPLETED audio not found: ${contentUuid}${error ? ` ${error.message}` : ''}`);
+    return {
+      id: String(data.id),
+      contentUuid: String(data.content_uuid),
+      workflowRunId: this.str(data.workflow_run_id),
+      moduleRunId: this.str(data.module_run_id),
+      storageBucket: String(data.audio_storage_bucket),
+      storagePath: String(data.audio_storage_path),
+      publicUrl: this.str(data.audio_public_url),
+      format: this.str(data.audio_format),
+      mimeType: this.str(data.audio_mime_type),
+      durationSeconds: this.number(data.duration_seconds),
+      sampleRate: this.number(data.sample_rate),
+      bitDepth: this.number(data.bit_depth),
+      channels: this.number(data.channels),
+      fileSizeBytes: this.number(data.file_size_bytes),
+      requestPayload: this.obj(data.request_payload),
+      createdAt: String(data.created_at),
+    };
+  }
+
+  async downloadAudio(source: AudioGenerationSource): Promise<Buffer> {
+    const { data, error } = await this.supabase.db.storage
+      .from(source.storageBucket)
+      .download(source.storagePath);
+    if (error || !data) throw new Error(`Audio download failed: ${error?.message ?? 'no data'}`);
+    return Buffer.from(await data.arrayBuffer());
+  }
+
+  async upsertAutomaticReview(input: {
+    contentUuid: string;
+    result: AudioQcResult;
+    analysis: AudioTechnicalAnalysis;
+    source: AudioGenerationSource;
+    runMode: string;
+  }): Promise<SavedReview> {
+    const now = new Date().toISOString();
+    const checklist = {
+      schemaVersion: 'EF-07-V1',
+      automaticReview: true,
+      runMode: input.runMode.toUpperCase(),
+      source: {
+        generationId: input.source.id,
+        storageBucket: input.source.storageBucket,
+        storagePath: input.source.storagePath,
+        databaseMetadata: {
+          format: input.source.format ?? null,
+          mimeType: input.source.mimeType ?? null,
+          durationSeconds: input.source.durationSeconds ?? null,
+          sampleRate: input.source.sampleRate ?? null,
+          bitDepth: input.source.bitDepth ?? null,
+          channels: input.source.channels ?? null,
+          fileSizeBytes: input.source.fileSizeBytes ?? null,
+        },
+      },
+      measured: input.analysis,
+      checks: input.result.checks,
+      issues: input.result.issues,
+    };
+    const notes = input.result.issues.length
+      ? input.result.issues.map((x) => `[${x.severity}] ${x.code}: ${x.message}`).join('\n')
+      : 'EF-07 automatic audio QC passed.';
+    const { data, error } = await this.supabase.db
+      .from('geef_reviews')
+      .upsert(
+        {
+          content_uuid: input.contentUuid,
+          review_round: 1,
+          decision: input.result.decision,
+          score: input.result.score,
+          reviewer_id: null,
+          checklist,
+          notes,
+          decided_at: now,
+          updated_at: now,
+        },
+        { onConflict: 'content_uuid,review_round' },
+      )
+      .select('id,content_uuid,review_round,decision,score')
+      .single();
+    if (error || !data) throw new Error(`Failed to upsert EF-07 review: ${error?.message ?? 'no data'}`);
+    return {
+      id: String(data.id),
+      contentUuid: String(data.content_uuid),
+      reviewRound: Number(data.review_round),
+      decision: data.decision,
+      score: data.score === null ? null : Number(data.score),
+    } as SavedReview;
+  }
+
+  async upsertFatalReview(input: {
+    contentUuid: string;
+    runMode: string;
+    errorCode: string;
+    errorMessage: string;
+  }): Promise<SavedReview> {
+    const now = new Date().toISOString();
+    const { data, error } = await this.supabase.db
+      .from('geef_reviews')
+      .upsert(
+        {
+          content_uuid: input.contentUuid,
+          review_round: 1,
+          decision: 'REJECTED',
+          score: 0,
+          reviewer_id: null,
+          checklist: {
+            schemaVersion: 'EF-07-V1',
+            automaticReview: true,
+            runMode: input.runMode,
+            fatalError: { code: input.errorCode, message: input.errorMessage },
+          },
+          notes: `[FATAL] ${input.errorCode}: ${input.errorMessage}`,
+          decided_at: now,
+          updated_at: now,
+        },
+        { onConflict: 'content_uuid,review_round' },
+      )
+      .select('id,content_uuid,review_round,decision,score')
+      .single();
+    if (error || !data) throw new Error(`Failed to save rejected EF-07 review: ${error?.message ?? 'no data'}`);
+    return {
+      id: String(data.id), contentUuid: String(data.content_uuid),
+      reviewRound: Number(data.review_round), decision: data.decision,
+      score: data.score === null ? null : Number(data.score),
+    } as SavedReview;
+  }
+
+  private str(value: unknown): string | undefined {
+    return typeof value === 'string' && value ? value : undefined;
+  }
+  private number(value: unknown): number | undefined {
+    const parsed = Number(value);
+    return value !== null && value !== undefined && Number.isFinite(parsed) ? parsed : undefined;
+  }
+  private obj(value: unknown): Record<string, unknown> {
+    return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  }
+}
+
+
+===== src\modules\ef07-audio-qc\module\ef07-audio-qc.module.ts =====
+import { Module } from '@nestjs/common';
+import { WorkflowModule } from '../../../common/workflow/workflow.module';
+import { ReviewAudioUseCase } from '../application/use-cases/review-audio.use-case';
+import { AudioReviewRepository } from '../domain/repositories/audio-review.repository';
+import { AudioAnalyzer } from '../domain/services/audio-analyzer.service';
+import { AudioQcPolicy } from '../domain/services/audio-qc-policy.service';
+import { SupabaseAudioReviewRepository } from '../infrastructure/supabase-audio-review.repository';
+import { FfmpegAudioAnalyzer } from '../infrastructure/ffmpeg-audio-analyzer.service';
+
+@Module({
+  imports: [WorkflowModule],
+  providers: [
+    ReviewAudioUseCase,
+    AudioQcPolicy,
+    { provide: AudioReviewRepository, useClass: SupabaseAudioReviewRepository },
+    { provide: AudioAnalyzer, useClass: FfmpegAudioAnalyzer },
+  ],
+  exports: [ReviewAudioUseCase],
+})
+export class Ef07AudioQcModule {}
+
+
+===== src\modules\ef03-music-spec\infrastructure\gemini-music-spec.generator.ts =====
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+
+import { GoogleAiService } from '../../../common/ai/google-ai.service';
+import { ModelRegistryService } from '../../../common/ai/model-registry.service';
+
+import {
+  MusicSpecGenerationResult,
+  MusicSpecGenerator,
+} from '../domain/services/music-spec-generator.service';
+
+import {
+  Ef02LyricsData,
+  Ef03ContextData,
+} from '../domain/repositories/music-spec.repository';
+
+@Injectable()
+export class GeminiMusicSpecGenerator
+  extends MusicSpecGenerator
+{
+  constructor(
+    private readonly googleAi: GoogleAiService,
+    private readonly models: ModelRegistryService,
+    private readonly config: ConfigService,
+  ) {
+    super();
+  }
+
+  async generate(
+    context: Ef03ContextData,
+    lyrics: Ef02LyricsData,
+    runMode: string,
+  ): Promise<MusicSpecGenerationResult> {
+    const production =
+      String(runMode).trim().toUpperCase() === 'PRODUCTION';
+
+    const model =
+      this.config.get<string>(
+        production
+          ? 'GEMINI_MUSIC_SPEC_MODEL_PRODUCTION'
+          : 'GEMINI_MUSIC_SPEC_MODEL_TEST',
+      ) ??
+      this.models.getGoogleModels(runMode).lyrics;
+
+    const result =
+      await this.googleAi.generateStructuredJson({
+        model,
+        systemInstruction: [
+          '?뱀떊? ?묎끝, ?멸끝, 蹂댁뺄 ?붾젆?? 誘뱀떛???숇젴???뚯븙 ?꾨줈??쒖엯?덈떎.',
+          'EF-01 而⑦뀓?ㅽ듃? EF-02 媛?щ? 遺꾩꽍??provider-independent Music Specification???ㅺ퀎?섏꽭??',
+          'Lyria, Suno, Udio ???뱀젙 ?쒕퉬???대쫫?대굹 ?꾩슜 ?뚮씪誘명꽣瑜?寃곌낵???ы븿?섏? 留덉꽭??',
+          '?뺤쓽??JSON ?ㅽ궎留덈쭔 諛섑솚?섏꽭??',
+        ].join(' '),
+        prompt: this.buildPrompt(context, lyrics),
+        responseJsonSchema: this.schema(),
+        maxOutputTokens: Number(
+          this.config.get<string>(
+            'GEMINI_MUSIC_SPEC_MAX_OUTPUT_TOKENS',
+          ) ?? '8192',
+        ),
+      });
+
+    return {
+      data: result.data,
+      generationInfo: {
+        ...result.generationInfo,
+      },
+    };
+  }
+
+  private buildPrompt(
+    context: Ef03ContextData,
+    lyrics: Ef02LyricsData,
+  ): string {
+    return [
+      '?꾨옒 ?뺣낫瑜?諛뷀깢?쇰줈 ?ㅼ젣 ?쒖옉 媛?ν븳 Music Specification???묒꽦?섏꽭??',
+      '',
+      '?ㅺ퀎 ?먯튃:',
+      '- 媛?ъ쓽 媛먯젙?좉낵 ?꾨졃??湲곗뼲?깆쓣 ?곗꽑?⑸땲??',
+      '- EF-01???λⅤ, BPM, Key??李멸퀬?섎릺 ?뚯븙?곸쑝濡??꾩슂?섎㈃ ?⑸━?곸쑝濡?議곗젙?????덉뒿?덈떎.',
+      '- 以묒옣?꾩링???몄븞?섍쾶 ?ㅼ쓣 ???덈뒗 媛?낆꽦怨?硫쒕줈???꾨떖?μ쓣 怨좊젮?⑸땲??',
+      '- instrumentation??avoid?먮뒗 ?쇳빐?????뚯깋?대굹 怨쇰룄???붿냼瑜?援ъ껜?곸쑝濡??곸뒿?덈떎.',
+      '- acoustic_ratio? electronic_ratio??媛곴컖 0~1?대ŉ 媛湲됱쟻 ?⑹씠 1??媛源앷쾶 ?ㅺ퀎?⑸땲??',
+      '- energy, valence, danceability??0~1 踰붿쐞?낅땲??',
+      '',
+      'EF-01 Context:',
+      JSON.stringify(context, null, 2),
+      '',
+      'EF-02 Lyrics:',
+      JSON.stringify(lyrics, null, 2),
+    ].join('\n');
+  }
+
+  private schema(): Record<string, unknown> {
+    return {
+      type: 'object',
+      properties: {
+        genre: { type: 'string' },
+        subgenre: { type: 'string' },
+        bpm: { type: 'integer' },
+        musical_key: { type: 'string' },
+        time_signature: { type: 'string' },
+        target_duration_sec: { type: 'integer' },
+        energy: { type: 'number' },
+        valence: { type: 'number' },
+        danceability: { type: 'number' },
+        mood: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+        instrumentation: {
+          type: 'object',
+          properties: {
+            primary: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+            secondary: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+            avoid: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+          },
+          required: ['primary', 'secondary', 'avoid'],
+          additionalProperties: false,
+        },
+        vocal_spec: {
+          type: 'object',
+          properties: {
+            type: { type: 'string' },
+            gender_character: { type: 'string' },
+            age_character: { type: 'string' },
+            tone: { type: 'string' },
+            range: { type: 'string' },
+            delivery: { type: 'string' },
+            vibrato: { type: 'string' },
+            harmony: { type: 'string' },
+          },
+          required: [
+            'type',
+            'gender_character',
+            'age_character',
+            'tone',
+            'range',
+            'delivery',
+            'vibrato',
+            'harmony',
+          ],
+          additionalProperties: false,
+        },
+        arrangement: {
+          type: 'object',
+          properties: {
+            intro: { type: 'string' },
+            verse: { type: 'string' },
+            pre_chorus: { type: 'string' },
+            chorus: { type: 'string' },
+            bridge: { type: 'string' },
+            final_chorus: { type: 'string' },
+            ending: { type: 'string' },
+          },
+          required: [
+            'intro',
+            'verse',
+            'pre_chorus',
+            'chorus',
+            'bridge',
+            'final_chorus',
+            'ending',
+          ],
+          additionalProperties: false,
+        },
+        production_style: {
+          type: 'object',
+          properties: {
+            overall: { type: 'string' },
+            acoustic_ratio: { type: 'number' },
+            electronic_ratio: { type: 'number' },
+            dynamic_range: { type: 'string' },
+            mix_character: { type: 'string' },
+            reverb: { type: 'string' },
+            mastering_character: { type: 'string' },
+          },
+          required: [
+            'overall',
+            'acoustic_ratio',
+            'electronic_ratio',
+            'dynamic_range',
+            'mix_character',
+            'reverb',
+            'mastering_character',
+          ],
+          additionalProperties: false,
+        },
+        generation_constraints: {
+          type: 'object',
+          properties: {
+            must_preserve: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+            avoid: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+          },
+          required: ['must_preserve', 'avoid'],
+          additionalProperties: false,
+        },
+      },
+      required: [
+        'genre',
+        'subgenre',
+        'bpm',
+        'musical_key',
+        'time_signature',
+        'target_duration_sec',
+        'energy',
+        'valence',
+        'danceability',
+        'mood',
+        'instrumentation',
+        'vocal_spec',
+        'arrangement',
+        'production_style',
+        'generation_constraints',
+      ],
+      additionalProperties: false,
+    };
+  }
+}
+
+
+===== src\modules\ef04-composition-plan\infrastructure\gemini-composition-plan.generator.ts =====
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+
+import { GoogleAiService } from '../../../common/ai/google-ai.service';
+
+import {
+  CompositionPlanGenerationResult,
+  CompositionPlanGenerator,
+} from '../domain/services/composition-plan-generator.service';
+
+import {
+  Ef04LyricsData,
+  Ef04MusicSpecData,
+} from '../domain/repositories/composition-plan.repository';
+
+@Injectable()
+export class GeminiCompositionPlanGenerator
+  extends CompositionPlanGenerator
+{
+  constructor(
+    private readonly googleAi:
+      GoogleAiService,
+
+    private readonly config:
+      ConfigService,
+  ) {
+    super();
+  }
+
+  async generate(
+    lyrics: Ef04LyricsData,
+    musicSpec: Ef04MusicSpecData,
+    runMode: string,
+  ): Promise<CompositionPlanGenerationResult> {
+    const production =
+      String(
+        runMode,
+      )
+        .trim()
+        .toUpperCase() ===
+      'PRODUCTION';
+
+    const model =
+      this.config.get<string>(
+        production
+          ? 'GEMINI_COMPOSITION_PLAN_MODEL_PRODUCTION'
+          : 'GEMINI_COMPOSITION_PLAN_MODEL_TEST',
+      ) ??
+      (
+        production
+          ? 'gemini-3.5-flash'
+          : 'gemini-3.5-flash-lite'
+      );
+
+    const result =
+      await this.googleAi
+        .generateStructuredJson({
+          model,
+
+          systemInstruction:
+            [
+              '?뱀떊? ?묎끝媛, ?멸끝媛, 蹂댁뺄 ?붾젆????븷???섑뻾?⑸땲??',
+              'EF-02 媛?ъ? EF-03 MusicSpec??諛뷀깢?쇰줈 provider-independent Composition Plan???ㅺ퀎?섏꽭??',
+              'EF-02??hookLine? SSOT?대ŉ ?덈?濡???媛??Hook?쇰줈 蹂寃쏀븯嫄곕굹 ??臾몄옣??留뚮뱾?댁꽌?????⑸땲??',
+              'Lyria, Suno, Udio ???뱀젙 ?앹꽦 ?쒕퉬???대쫫?대굹 ?꾩슜 ?뚮씪誘명꽣瑜??ы븿?섏? 留덉꽭??',
+              '?ㅼ젣 怨??쒖옉???쒖슜?????덉쓣 ?뺣룄濡?援ъ껜?곸쑝濡??묒꽦?섏꽭??',
+              '?뺤쓽??JSON ?ㅽ궎留덈쭔 諛섑솚?섏꽭??',
+            ].join(' '),
+
+          prompt:
+            this.buildPrompt(
+              lyrics,
+              musicSpec,
+            ),
+
+          responseJsonSchema:
+            this.schema(),
+
+          maxOutputTokens:
+            Number(
+              this.config.get<string>(
+                'GEMINI_COMPOSITION_PLAN_MAX_OUTPUT_TOKENS',
+              ) ??
+              '8192',
+            ),
+        });
+
+    return {
+      data:
+        result.data,
+
+      generationInfo: {
+        ...result.generationInfo,
+      },
+    };
+  }
+
+  private buildPrompt(
+    lyrics: Ef04LyricsData,
+    musicSpec: Ef04MusicSpecData,
+  ): string {
+    return [
+      '?꾨옒 媛?ъ? MusicSpec??諛뷀깢?쇰줈 Composition Plan???묒꽦?섏꽭??',
+      '',
+      `?꾩껜 紐⑺몴 湲몄씠: ?뺥솗??${musicSpec.targetDurationSec}珥?,
+      `?뺤떇 lyrical hook: "${lyrics.hookLine}"`,
+      '',
+      '?꾩닔 ?먯튃:',
+      `- song_structure??target_sec ?⑷퀎???뺥솗??${musicSpec.targetDurationSec}珥덇? ?섎룄濡??ㅺ퀎?⑸땲??`,
+      '- hook_strategy.lyrical_hook?먮뒗 ???뺤떇 lyrical hook??洹몃?濡??ъ슜?⑸땲??',
+      '- ?덈줈??媛??臾멸뎄瑜?Hook?쇰줈 諛쒕챸?섏? ?딆뒿?덈떎.',
+      '- ?꾨졃? 硫쒕줈?붿? ?뺤떇 媛??Hook??紐낇솗?댁빞 ?⑸땲??',
+      '- Verse? Chorus???먮꼫吏 ?鍮꾨? ?ㅺ퀎?⑸땲??',
+      '- instrumentation_cues?먮뒗 ?낃린蹂??깆옣怨???븷??紐낆떆?⑸땲??',
+      '- section_timing? 媛?二쇱슂 ?뱀뀡??珥??⑥쐞 紐⑺몴 湲몄씠瑜??ы븿?⑸땲??',
+      '- ?뱀젙 AI ?뚯븙 ?앹꽦 ?쒕퉬?ㅼ슜 ?꾨＼?꾪듃???묒꽦?섏? ?딆뒿?덈떎.',
+      '',
+      'EF-02 Lyrics:',
+      JSON.stringify(
+        lyrics,
+        null,
+        2,
+      ),
+      '',
+      'EF-03 MusicSpec:',
+      JSON.stringify(
+        musicSpec,
+        null,
+        2,
+      ),
+    ].join('\n');
+  }
+
+  private schema():
+    Record<string, unknown> {
+    return {
+      type:
+        'object',
+
+      properties: {
+        title_ko: {
+          type:
+            'string',
+        },
+
+        title_en: {
+          type:
+            'string',
+        },
+
+        language: {
+          type:
+            'string',
+        },
+
+        target_duration_sec: {
+          type:
+            'integer',
+        },
+
+        bpm: {
+          type:
+            'integer',
+        },
+
+        musical_key: {
+          type:
+            'string',
+        },
+
+        time_signature: {
+          type:
+            'string',
+        },
+
+        song_structure: {
+          type:
+            'array',
+
+          items: {
+            type:
+              'object',
+
+            properties: {
+              section: {
+                type:
+                  'string',
+              },
+
+              order: {
+                type:
+                  'integer',
+              },
+
+              target_sec: {
+                type:
+                  'integer',
+              },
+
+              purpose: {
+                type:
+                  'string',
+              },
+            },
+
+            required: [
+              'section',
+              'order',
+              'target_sec',
+              'purpose',
+            ],
+
+            additionalProperties:
+              false,
+          },
+        },
+
+        section_timing: {
+          type:
+            'object',
+
+          additionalProperties: {
+            type:
+              'number',
+          },
+        },
+
+        harmony_plan: {
+          type:
+            'object',
+
+          properties: {
+            tonal_center: {
+              type:
+                'string',
+            },
+
+            progression_direction: {
+              type:
+                'array',
+
+              items: {
+                type:
+                  'string',
+              },
+            },
+
+            cadence_strategy: {
+              type:
+                'string',
+            },
+
+            harmonic_tension: {
+              type:
+                'string',
+            },
+          },
+
+          required: [
+            'tonal_center',
+            'progression_direction',
+            'cadence_strategy',
+            'harmonic_tension',
+          ],
+
+          additionalProperties:
+            false,
+        },
+
+        melody_plan: {
+          type:
+            'object',
+
+          properties: {
+            contour: {
+              type:
+                'string',
+            },
+
+            range_strategy: {
+              type:
+                'string',
+            },
+
+            motif_strategy: {
+              type:
+                'string',
+            },
+
+            chorus_lift: {
+              type:
+                'string',
+            },
+
+            climax_strategy: {
+              type:
+                'string',
+            },
+          },
+
+          required: [
+            'contour',
+            'range_strategy',
+            'motif_strategy',
+            'chorus_lift',
+            'climax_strategy',
+          ],
+
+          additionalProperties:
+            false,
+        },
+
+        rhythm_plan: {
+          type:
+            'object',
+
+          properties: {
+            groove: {
+              type:
+                'string',
+            },
+
+            pulse: {
+              type:
+                'string',
+            },
+
+            syncopation: {
+              type:
+                'string',
+            },
+
+            density_curve: {
+              type:
+                'string',
+            },
+          },
+
+          required: [
+            'groove',
+            'pulse',
+            'syncopation',
+            'density_curve',
+          ],
+
+          additionalProperties:
+            false,
+        },
+
+        vocal_phrasing_plan: {
+          type:
+            'object',
+
+          properties: {
+            verse: {
+              type:
+                'string',
+            },
+
+            pre_chorus: {
+              type:
+                'string',
+            },
+
+            chorus: {
+              type:
+                'string',
+            },
+
+            bridge: {
+              type:
+                'string',
+            },
+
+            final_chorus: {
+              type:
+                'string',
+            },
+          },
+
+          required: [
+            'verse',
+            'pre_chorus',
+            'chorus',
+            'bridge',
+            'final_chorus',
+          ],
+
+          additionalProperties:
+            false,
+        },
+
+        instrumentation_cues: {
+          type:
+            'array',
+
+          items: {
+            type:
+              'object',
+
+            properties: {
+              instrument: {
+                type:
+                  'string',
+              },
+
+              entry_section: {
+                type:
+                  'string',
+              },
+
+              exit_section: {
+                type:
+                  'string',
+              },
+
+              role: {
+                type:
+                  'string',
+              },
+            },
+
+            required: [
+              'instrument',
+              'entry_section',
+              'exit_section',
+              'role',
+            ],
+
+            additionalProperties:
+              false,
+          },
+        },
+
+        dynamics_plan: {
+          type:
+            'object',
+
+          properties: {
+            opening: {
+              type:
+                'string',
+            },
+
+            development: {
+              type:
+                'string',
+            },
+
+            climax: {
+              type:
+                'string',
+            },
+
+            ending: {
+              type:
+                'string',
+            },
+          },
+
+          required: [
+            'opening',
+            'development',
+            'climax',
+            'ending',
+          ],
+
+          additionalProperties:
+            false,
+        },
+
+        transition_plan: {
+          type:
+            'array',
+
+          items: {
+            type:
+              'object',
+
+            properties: {
+              from: {
+                type:
+                  'string',
+              },
+
+              to: {
+                type:
+                  'string',
+              },
+
+              method: {
+                type:
+                  'string',
+              },
+            },
+
+            required: [
+              'from',
+              'to',
+              'method',
+            ],
+
+            additionalProperties:
+              false,
+          },
+        },
+
+        hook_strategy: {
+          type:
+            'object',
+
+          properties: {
+            lyrical_hook: {
+              type:
+                'string',
+            },
+
+            melodic_hook: {
+              type:
+                'string',
+            },
+
+            repetition_strategy: {
+              type:
+                'string',
+            },
+
+            placement_strategy: {
+              type:
+                'string',
+            },
+          },
+
+          required: [
+            'lyrical_hook',
+            'melodic_hook',
+            'repetition_strategy',
+            'placement_strategy',
+          ],
+
+          additionalProperties:
+            false,
+        },
+
+        generation_constraints: {
+          type:
+            'object',
+
+          properties: {
+            must_preserve: {
+              type:
+                'array',
+
+              items: {
+                type:
+                  'string',
+              },
+            },
+
+            avoid: {
+              type:
+                'array',
+
+              items: {
+                type:
+                  'string',
+              },
+            },
+          },
+
+          required: [
+            'must_preserve',
+            'avoid',
+          ],
+
+          additionalProperties:
+            false,
+        },
+      },
+
+      required: [
+        'title_ko',
+        'title_en',
+        'language',
+        'target_duration_sec',
+        'bpm',
+        'musical_key',
+        'time_signature',
+        'song_structure',
+        'section_timing',
+        'harmony_plan',
+        'melody_plan',
+        'rhythm_plan',
+        'vocal_phrasing_plan',
+        'instrumentation_cues',
+        'dynamics_plan',
+        'transition_plan',
+        'hook_strategy',
+        'generation_constraints',
+      ],
+
+      additionalProperties:
+        false,
+    };
+  }
+}
+

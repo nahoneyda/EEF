@@ -1,0 +1,256 @@
+﻿  D:\myProject\chatGpt\EEF\app.py:412:                    module_run_id=module_run_id,
+  D:\myProject\chatGpt\EEF\app.py:413:                    success=False,
+  D:\myProject\chatGpt\EEF\app.py:414:                    output_payload={
+  D:\myProject\chatGpt\EEF\app.py:415:                        "module_code": "EF-01",
+  D:\myProject\chatGpt\EEF\app.py:416:                        "content_id": content_id,
+  D:\myProject\chatGpt\EEF\app.py:417:                        "content_uuid": job.get(
+  D:\myProject\chatGpt\EEF\app.py:418:                            "content_uuid"
+  D:\myProject\chatGpt\EEF\app.py:419:                        ),
+  D:\myProject\chatGpt\EEF\app.py:420:                        "workflow_run_id": job.get(
+  D:\myProject\chatGpt\EEF\app.py:421:                            "workflow_run_id"
+  D:\myProject\chatGpt\EEF\app.py:422:                        ),
+  D:\myProject\chatGpt\EEF\app.py:423:                        "module_run_id": module_run_id,
+  D:\myProject\chatGpt\EEF\app.py:424:                        "context_status": "FAILED",
+  D:\myProject\chatGpt\EEF\app.py:425:                    },
+  D:\myProject\chatGpt\EEF\app.py:426:                    error_code="EF01_EXECUTION_FAILED",
+  D:\myProject\chatGpt\EEF\app.py:427:                    error_message=str(exc)[:2000],
+  D:\myProject\chatGpt\EEF\app.py:428:                )
+  D:\myProject\chatGpt\EEF\app.py:429:
+  D:\myProject\chatGpt\EEF\app.py:430:                logger.info(
+  D:\myProject\chatGpt\EEF\app.py:431:                    "EF-01 module marked as FAILED: "
+  D:\myProject\chatGpt\EEF\app.py:432:                    "module_run_id=%s",
+  D:\myProject\chatGpt\EEF\app.py:433:                    module_run_id,
+  D:\myProject\chatGpt\EEF\app.py:434:                )
+  D:\myProject\chatGpt\EEF\app.py:435:
+  D:\myProject\chatGpt\EEF\app.py:436:            except Exception:
+  D:\myProject\chatGpt\EEF\app.py:437:                logger.exception(
+  D:\myProject\chatGpt\EEF\app.py:438:                    "Failed to mark EF-01 as FAILED: "
+  D:\myProject\chatGpt\EEF\app.py:439:                    "module_run_id=%s",
+  D:\myProject\chatGpt\EEF\app.py:440:                    module_run_id,
+  D:\myProject\chatGpt\EEF\app.py:441:                )
+  D:\myProject\chatGpt\EEF\app.py:442:
+  D:\myProject\chatGpt\EEF\app.py:443:        raise
+  D:\myProject\chatGpt\EEF\app.py:444:
+  D:\myProject\chatGpt\EEF\app.py:445:
+  D:\myProject\chatGpt\EEF\app.py:446:# ============================================================
+  D:\myProject\chatGpt\EEF\app.py:447:# 다음 실행 모듈 조회
+  D:\myProject\chatGpt\EEF\app.py:448:# ============================================================
+  D:\myProject\chatGpt\EEF\app.py:449:
+  D:\myProject\chatGpt\EEF\app.py:450:def get_next_module(
+  D:\myProject\chatGpt\EEF\app.py:451:    workflow_run_id: str,
+  D:\myProject\chatGpt\EEF\app.py:452:) -> dict[str, Any]:
+  D:\myProject\chatGpt\EEF\app.py:453:    result = supabase.rpc(
+  D:\myProject\chatGpt\EEF\app.py:454:        os.getenv(
+  D:\myProject\chatGpt\EEF\app.py:455:            "RPC_GET_NEXT_MODULE",
+  D:\myProject\chatGpt\EEF\app.py:456:            "geef_get_next_queued_module",
+  D:\myProject\chatGpt\EEF\app.py:457:        ),
+  D:\myProject\chatGpt\EEF\app.py:458:        {
+  D:\myProject\chatGpt\EEF\app.py:459:            "p_workflow_run_id": workflow_run_id,
+  D:\myProject\chatGpt\EEF\app.py:460:        },
+  D:\myProject\chatGpt\EEF\app.py:461:    )
+  D:\myProject\chatGpt\EEF\app.py:462:
+  D:\myProject\chatGpt\EEF\app.py:463:    next_module = first_row(result)
+  D:\myProject\chatGpt\EEF\app.py:464:
+  D:\myProject\chatGpt\EEF\app.py:465:    if not next_module:
+  D:\myProject\chatGpt\EEF\app.py:466:        return {
+  D:\myProject\chatGpt\EEF\app.py:467:            "found": False,
+  D:\myProject\chatGpt\EEF\app.py:468:            "workflow_run_id": workflow_run_id,
+  D:\myProject\chatGpt\EEF\app.py:469:        }
+  D:\myProject\chatGpt\EEF\app.py:470:
+  D:\myProject\chatGpt\EEF\app.py:471:    return next_module
+  D:\myProject\chatGpt\EEF\app.py:472:
+  D:\myProject\chatGpt\EEF\app.py:473:
+  D:\myProject\chatGpt\EEF\app.py:474:# ============================================================
+  D:\myProject\chatGpt\EEF\app.py:475:# Health API
+  D:\myProject\chatGpt\EEF\app.py:476:# ============================================================
+  D:\myProject\chatGpt\EEF\app.py:477:
+  D:\myProject\chatGpt\EEF\app.py:478:@app.get("/")
+  D:\myProject\chatGpt\EEF\app.py:479:@app.get("/health")
+  D:\myProject\chatGpt\EEF\app.py:480:def health():
+  D:\myProject\chatGpt\EEF\app.py:481:    return jsonify(
+  D:\myProject\chatGpt\EEF\app.py:482:        {
+  D:\myProject\chatGpt\EEF\app.py:483:            "ok": True,
+  D:\myProject\chatGpt\EEF\app.py:484:            "service": "geef-cloud-run-worker",
+  D:\myProject\chatGpt\EEF\app.py:485:            "dry_run": env_bool(
+  D:\myProject\chatGpt\EEF\app.py:486:                "DRY_RUN",
+  D:\myProject\chatGpt\EEF\app.py:487:                True,
+  D:\myProject\chatGpt\EEF\app.py:488:            ),
+  D:\myProject\chatGpt\EEF\app.py:489:            "supabase_configured": (
+  D:\myProject\chatGpt\EEF\app.py:490:                supabase.configured()
+  D:\myProject\chatGpt\EEF\app.py:491:            ),
+> D:\myProject\chatGpt\EEF\app.py:492:            "supported_modules": [
+  D:\myProject\chatGpt\EEF\app.py:493:                "EF-00",
+  D:\myProject\chatGpt\EEF\app.py:494:                "EF-01",
+  D:\myProject\chatGpt\EEF\app.py:495:            ],
+  D:\myProject\chatGpt\EEF\app.py:496:        }
+  D:\myProject\chatGpt\EEF\app.py:497:    )
+  D:\myProject\chatGpt\EEF\app.py:498:
+  D:\myProject\chatGpt\EEF\app.py:499:
+  D:\myProject\chatGpt\EEF\app.py:500:# ============================================================
+  D:\myProject\chatGpt\EEF\app.py:501:# Next Module API
+  D:\myProject\chatGpt\EEF\app.py:502:# ============================================================
+  D:\myProject\chatGpt\EEF\app.py:503:
+  D:\myProject\chatGpt\EEF\app.py:504:@app.post("/next-module")
+  D:\myProject\chatGpt\EEF\app.py:505:def next_module():
+  D:\myProject\chatGpt\EEF\app.py:506:    body = request.get_json(
+  D:\myProject\chatGpt\EEF\app.py:507:        silent=True,
+  D:\myProject\chatGpt\EEF\app.py:508:    ) or {}
+  D:\myProject\chatGpt\EEF\app.py:509:
+  D:\myProject\chatGpt\EEF\app.py:510:    workflow_run_id = body.get(
+  D:\myProject\chatGpt\EEF\app.py:511:        "workflow_run_id"
+  D:\myProject\chatGpt\EEF\app.py:512:    )
+  D:\myProject\chatGpt\EEF\app.py:513:
+  D:\myProject\chatGpt\EEF\app.py:514:    if not workflow_run_id:
+  D:\myProject\chatGpt\EEF\app.py:515:        return jsonify(
+  D:\myProject\chatGpt\EEF\app.py:516:            {
+  D:\myProject\chatGpt\EEF\app.py:517:                "ok": False,
+  D:\myProject\chatGpt\EEF\app.py:518:                "error": (
+  D:\myProject\chatGpt\EEF\app.py:519:                    "workflow_run_id is required"
+  D:\myProject\chatGpt\EEF\app.py:520:                ),
+  D:\myProject\chatGpt\EEF\app.py:521:            }
+  D:\myProject\chatGpt\EEF\app.py:522:        ), 400
+  D:\myProject\chatGpt\EEF\app.py:523:
+  D:\myProject\chatGpt\EEF\app.py:524:    try:
+  D:\myProject\chatGpt\EEF\app.py:525:        result = get_next_module(
+  D:\myProject\chatGpt\EEF\app.py:526:            workflow_run_id
+  D:\myProject\chatGpt\EEF\app.py:527:        )
+  D:\myProject\chatGpt\EEF\app.py:528:
+  D:\myProject\chatGpt\EEF\app.py:529:        return jsonify(
+  D:\myProject\chatGpt\EEF\app.py:530:            {
+  D:\myProject\chatGpt\EEF\app.py:531:                "ok": True,
+  D:\myProject\chatGpt\EEF\app.py:532:                "next_module": result,
+  D:\myProject\chatGpt\EEF\app.py:533:            }
+  D:\myProject\chatGpt\EEF\app.py:534:        )
+  D:\myProject\chatGpt\EEF\app.py:535:
+  D:\myProject\chatGpt\EEF\app.py:536:    except Exception as exc:
+  D:\myProject\chatGpt\EEF\app.py:537:        logger.exception(
+  D:\myProject\chatGpt\EEF\app.py:538:            "next-module failed: "
+  D:\myProject\chatGpt\EEF\app.py:539:            "workflow_run_id=%s",
+  D:\myProject\chatGpt\EEF\app.py:540:            workflow_run_id,
+  D:\myProject\chatGpt\EEF\app.py:541:        )
+  D:\myProject\chatGpt\EEF\app.py:542:
+  D:\myProject\chatGpt\EEF\app.py:543:        return jsonify(
+  D:\myProject\chatGpt\EEF\app.py:544:            {
+  D:\myProject\chatGpt\EEF\app.py:545:                "ok": False,
+  D:\myProject\chatGpt\EEF\app.py:546:                "error": str(exc),
+  D:\myProject\chatGpt\EEF\app.py:547:            }
+  D:\myProject\chatGpt\EEF\app.py:548:        ), 500
+  D:\myProject\chatGpt\EEF\app.py:549:
+  D:\myProject\chatGpt\EEF\app.py:550:
+  D:\myProject\chatGpt\EEF\app.py:551:# ============================================================
+  D:\myProject\chatGpt\EEF\app.py:552:# Execute API
+  D:\myProject\chatGpt\EEF\app.py:553:# ============================================================
+  D:\myProject\chatGpt\EEF\app.py:554:
+> D:\myProject\chatGpt\EEF\app.py:555:@app.post("/execute")
+> D:\myProject\chatGpt\EEF\app.py:556:def execute():
+  D:\myProject\chatGpt\EEF\app.py:557:    request_started = time.perf_counter()
+  D:\myProject\chatGpt\EEF\app.py:558:
+  D:\myProject\chatGpt\EEF\app.py:559:    body = request.get_json(
+  D:\myProject\chatGpt\EEF\app.py:560:        silent=True,
+  D:\myProject\chatGpt\EEF\app.py:561:    ) or {}
+  D:\myProject\chatGpt\EEF\app.py:562:
+  D:\myProject\chatGpt\EEF\app.py:563:    module_code = body.get(
+  D:\myProject\chatGpt\EEF\app.py:564:        "module_code",
+  D:\myProject\chatGpt\EEF\app.py:565:        "EF-01",
+  D:\myProject\chatGpt\EEF\app.py:566:    )
+  D:\myProject\chatGpt\EEF\app.py:567:
+  D:\myProject\chatGpt\EEF\app.py:568:    try:
+  D:\myProject\chatGpt\EEF\app.py:569:        if module_code == "EF-00":
+  D:\myProject\chatGpt\EEF\app.py:570:            result = {
+  D:\myProject\chatGpt\EEF\app.py:571:                "dry_run": env_bool(
+  D:\myProject\chatGpt\EEF\app.py:572:                    "DRY_RUN",
+  D:\myProject\chatGpt\EEF\app.py:573:                    True,
+  D:\myProject\chatGpt\EEF\app.py:574:                ),
+  D:\myProject\chatGpt\EEF\app.py:575:                "module_code": "EF-00",
+  D:\myProject\chatGpt\EEF\app.py:576:                "message": (
+  D:\myProject\chatGpt\EEF\app.py:577:                    "Project Control accepted"
+  D:\myProject\chatGpt\EEF\app.py:578:                ),
+  D:\myProject\chatGpt\EEF\app.py:579:            }
+  D:\myProject\chatGpt\EEF\app.py:580:
+  D:\myProject\chatGpt\EEF\app.py:581:        elif module_code == "EF-01":
+  D:\myProject\chatGpt\EEF\app.py:582:            result = run_ef01(body)
+  D:\myProject\chatGpt\EEF\app.py:583:
+  D:\myProject\chatGpt\EEF\app.py:584:        else:
+  D:\myProject\chatGpt\EEF\app.py:585:            return jsonify(
+  D:\myProject\chatGpt\EEF\app.py:586:                {
+  D:\myProject\chatGpt\EEF\app.py:587:                    "ok": False,
+  D:\myProject\chatGpt\EEF\app.py:588:                    "error": (
+  D:\myProject\chatGpt\EEF\app.py:589:                        f"Unsupported module: "
+  D:\myProject\chatGpt\EEF\app.py:590:                        f"{module_code}"
+  D:\myProject\chatGpt\EEF\app.py:591:                    ),
+  D:\myProject\chatGpt\EEF\app.py:592:                }
+  D:\myProject\chatGpt\EEF\app.py:593:            ), 400
+  D:\myProject\chatGpt\EEF\app.py:594:
+  D:\myProject\chatGpt\EEF\app.py:595:        result["duration_ms"] = round(
+  D:\myProject\chatGpt\EEF\app.py:596:            (
+  D:\myProject\chatGpt\EEF\app.py:597:                time.perf_counter()
+  D:\myProject\chatGpt\EEF\app.py:598:                - request_started
+  D:\myProject\chatGpt\EEF\app.py:599:            )
+  D:\myProject\chatGpt\EEF\app.py:600:            * 1000
+  D:\myProject\chatGpt\EEF\app.py:601:        )
+  D:\myProject\chatGpt\EEF\app.py:602:
+  D:\myProject\chatGpt\EEF\app.py:603:        return jsonify(
+  D:\myProject\chatGpt\EEF\app.py:604:            {
+  D:\myProject\chatGpt\EEF\app.py:605:                "ok": True,
+  D:\myProject\chatGpt\EEF\app.py:606:                "result": result,
+  D:\myProject\chatGpt\EEF\app.py:607:            }
+  D:\myProject\chatGpt\EEF\app.py:608:        )
+  D:\myProject\chatGpt\EEF\app.py:609:
+  D:\myProject\chatGpt\EEF\app.py:610:    except ValueError as exc:
+  D:\myProject\chatGpt\EEF\app.py:611:        duration_ms = round(
+  D:\myProject\chatGpt\EEF\app.py:612:            (
+  D:\myProject\chatGpt\EEF\app.py:613:                time.perf_counter()
+  D:\myProject\chatGpt\EEF\app.py:614:                - request_started
+  D:\myProject\chatGpt\EEF\app.py:615:            )
+  D:\myProject\chatGpt\EEF\app.py:616:            * 1000
+  D:\myProject\chatGpt\EEF\app.py:617:        )
+  D:\myProject\chatGpt\EEF\app.py:618:
+  D:\myProject\chatGpt\EEF\app.py:619:        return jsonify(
+  D:\myProject\chatGpt\EEF\app.py:620:            {
+  D:\myProject\chatGpt\EEF\app.py:621:                "ok": False,
+  D:\myProject\chatGpt\EEF\app.py:622:                "module_code": module_code,
+  D:\myProject\chatGpt\EEF\app.py:623:                "duration_ms": duration_ms,
+  D:\myProject\chatGpt\EEF\app.py:624:                "error": str(exc),
+  D:\myProject\chatGpt\EEF\app.py:625:            }
+  D:\myProject\chatGpt\EEF\app.py:626:        ), 400
+  D:\myProject\chatGpt\EEF\app.py:627:
+  D:\myProject\chatGpt\EEF\app.py:628:    except Exception as exc:
+  D:\myProject\chatGpt\EEF\app.py:629:        duration_ms = round(
+  D:\myProject\chatGpt\EEF\app.py:630:            (
+  D:\myProject\chatGpt\EEF\app.py:631:                time.perf_counter()
+  D:\myProject\chatGpt\EEF\app.py:632:                - request_started
+  D:\myProject\chatGpt\EEF\app.py:633:            )
+  D:\myProject\chatGpt\EEF\app.py:634:            * 1000
+  D:\myProject\chatGpt\EEF\app.py:635:        )
+  D:\myProject\chatGpt\EEF\app.py:636:
+  D:\myProject\chatGpt\EEF\app.py:637:        logger.exception(
+  D:\myProject\chatGpt\EEF\app.py:638:            "execution failed: module_code=%s",
+  D:\myProject\chatGpt\EEF\app.py:639:            module_code,
+  D:\myProject\chatGpt\EEF\app.py:640:        )
+  D:\myProject\chatGpt\EEF\app.py:641:
+  D:\myProject\chatGpt\EEF\app.py:642:        return jsonify(
+  D:\myProject\chatGpt\EEF\app.py:643:            {
+  D:\myProject\chatGpt\EEF\app.py:644:                "ok": False,
+  D:\myProject\chatGpt\EEF\app.py:645:                "module_code": module_code,
+  D:\myProject\chatGpt\EEF\app.py:646:                "duration_ms": duration_ms,
+  D:\myProject\chatGpt\EEF\app.py:647:                "error": str(exc),
+  D:\myProject\chatGpt\EEF\app.py:648:            }
+  D:\myProject\chatGpt\EEF\app.py:649:        ), 500
+  D:\myProject\chatGpt\EEF\app.py:650:
+  D:\myProject\chatGpt\EEF\app.py:651:
+  D:\myProject\chatGpt\EEF\app.py:652:# ============================================================
+  D:\myProject\chatGpt\EEF\app.py:653:# 로컬 실행
+  D:\myProject\chatGpt\EEF\app.py:654:# ============================================================
+  D:\myProject\chatGpt\EEF\app.py:655:
+  D:\myProject\chatGpt\EEF\app.py:656:if __name__ == "__main__":
+  D:\myProject\chatGpt\EEF\app.py:657:    port = int(
+  D:\myProject\chatGpt\EEF\app.py:658:        os.getenv(
+  D:\myProject\chatGpt\EEF\app.py:659:            "PORT",
+  D:\myProject\chatGpt\EEF\app.py:660:            "8080",
+  D:\myProject\chatGpt\EEF\app.py:661:        )
+  D:\myProject\chatGpt\EEF\app.py:662:    )
+  D:\myProject\chatGpt\EEF\app.py:663:
+  D:\myProject\chatGpt\EEF\app.py:664:    app.run(
+  D:\myProject\chatGpt\EEF\app.py:665:        host="0.0.0.0",
+  D:\myProject\chatGpt\EEF\app.py:666:        port=port,
+  D:\myProject\chatGpt\EEF\app.py:667:    )

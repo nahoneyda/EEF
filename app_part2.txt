@@ -1,0 +1,228 @@
+﻿                    module_run_id,
+                )
+
+        raise
+
+
+# ============================================================
+# ?ㅼ쓬 ?ㅽ뻾 紐⑤뱢 議고쉶
+# ============================================================
+
+def get_next_module(
+    workflow_run_id: str,
+) -> dict[str, Any]:
+    result = supabase.rpc(
+        os.getenv(
+            "RPC_GET_NEXT_MODULE",
+            "geef_get_next_queued_module",
+        ),
+        {
+            "p_workflow_run_id": workflow_run_id,
+        },
+    )
+
+    next_module = first_row(result)
+
+    if not next_module:
+        return {
+            "found": False,
+            "workflow_run_id": workflow_run_id,
+        }
+
+    return next_module
+
+
+# ============================================================
+# Health API
+# ============================================================
+
+@app.get("/")
+@app.get("/health")
+def health():
+    return jsonify(
+        {
+            "ok": True,
+            "service": "geef-cloud-run-worker",
+            "dry_run": env_bool(
+                "DRY_RUN",
+                True,
+            ),
+            "supabase_configured": (
+                supabase.configured()
+            ),
+            "supported_modules": [
+                "EF-00",
+                "EF-01",
+            ],
+        }
+    )
+
+
+# ============================================================
+# Next Module API
+# ============================================================
+
+@app.post("/next-module")
+def next_module():
+    body = request.get_json(
+        silent=True,
+    ) or {}
+
+    workflow_run_id = body.get(
+        "workflow_run_id"
+    )
+
+    if not workflow_run_id:
+        return jsonify(
+            {
+                "ok": False,
+                "error": (
+                    "workflow_run_id is required"
+                ),
+            }
+        ), 400
+
+    try:
+        result = get_next_module(
+            workflow_run_id
+        )
+
+        return jsonify(
+            {
+                "ok": True,
+                "next_module": result,
+            }
+        )
+
+    except Exception as exc:
+        logger.exception(
+            "next-module failed: "
+            "workflow_run_id=%s",
+            workflow_run_id,
+        )
+
+        return jsonify(
+            {
+                "ok": False,
+                "error": str(exc),
+            }
+        ), 500
+
+
+# ============================================================
+# Execute API
+# ============================================================
+
+@app.post("/execute")
+def execute():
+    request_started = time.perf_counter()
+
+    body = request.get_json(
+        silent=True,
+    ) or {}
+
+    module_code = body.get(
+        "module_code",
+        "EF-01",
+    )
+
+    try:
+        if module_code == "EF-00":
+            result = {
+                "dry_run": env_bool(
+                    "DRY_RUN",
+                    True,
+                ),
+                "module_code": "EF-00",
+                "message": (
+                    "Project Control accepted"
+                ),
+            }
+
+        elif module_code == "EF-01":
+            result = run_ef01(body)
+
+        else:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": (
+                        f"Unsupported module: "
+                        f"{module_code}"
+                    ),
+                }
+            ), 400
+
+        result["duration_ms"] = round(
+            (
+                time.perf_counter()
+                - request_started
+            )
+            * 1000
+        )
+
+        return jsonify(
+            {
+                "ok": True,
+                "result": result,
+            }
+        )
+
+    except ValueError as exc:
+        duration_ms = round(
+            (
+                time.perf_counter()
+                - request_started
+            )
+            * 1000
+        )
+
+        return jsonify(
+            {
+                "ok": False,
+                "module_code": module_code,
+                "duration_ms": duration_ms,
+                "error": str(exc),
+            }
+        ), 400
+
+    except Exception as exc:
+        duration_ms = round(
+            (
+                time.perf_counter()
+                - request_started
+            )
+            * 1000
+        )
+
+        logger.exception(
+            "execution failed: module_code=%s",
+            module_code,
+        )
+
+        return jsonify(
+            {
+                "ok": False,
+                "module_code": module_code,
+                "duration_ms": duration_ms,
+                "error": str(exc),
+            }
+        ), 500
+
+
+# ============================================================
+# 濡쒖뺄 ?ㅽ뻾
+# ============================================================
+
+if __name__ == "__main__":
+    port = int(
+        os.getenv(
+            "PORT",
+            "8080",
+        )
+    )
+
+    app.run(
+        host="0.0.0.0",
+        port=port,
+    )

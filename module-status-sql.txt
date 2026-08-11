@@ -1,0 +1,743 @@
+﻿
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:11:-- Fail early when the prerequisite migration was not ins
+talled.
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:12:do $$
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:13:begin
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:14:  if to_regclass('public.geef_contents') is null
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:15:     or to_regclass('public.geef_workflow_runs') is null
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:16:     or to_regclass('public.geef_module_runs') is null th
+en
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:17:    raise exception
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:18:      'GEEF_02-01-01_supabase_core.sql must be installed 
+before this migration';
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:19:  end if;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:20:end $$;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:21:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:22:-- ------------------------------------------------------
+---------------------
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:23:-- 0. EF-00 execution-control ledger (append-only attempt
+s and events)
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:24:-- ------------------------------------------------------
+---------------------
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:25:create table if not exists public.geef_execution_requests
+ (
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:26:  id uuid primary key default gen_random_uuid(),
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:27:  request_key text not null unique,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:28:  content_uuid uuid not null references public.geef_conte
+nts(id) on delete cascade,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:29:  start_module_code text not null default 'EF-00',
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:30:  end_module_code text not null default 'EF-17',
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:31:  run_mode public.geef_run_mode not null,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:32:  status public.geef_run_status not null default 'QUEUED'
+,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:33:  priority smallint not null default 100,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:34:  requested_by text not null default 'SYSTEM',
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:35:  request_payload jsonb not null default '{}'::jsonb,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:36:  workflow_run_id uuid references public.geef_workflow_ru
+ns(id) on delete set null,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:200:    p_start_module_code, p_end_module_code, p_parent_run
+_id,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:201:    coalesce(nullif(trim(p_triggered_by), ''), 'MANUAL')
+,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:202:    coalesce(p_input_payload, '{}'::jsonb)
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:203:  ) returning * into v_workflow;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:204:
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:205:  insert into public.geef_module_runs(
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:206:    workflow_run_id, module_id, attempt_no, status, idem
+potency_key,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:207:    input_payload
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:208:  )
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:209:  select
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:210:    v_workflow.id,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:211:    m.id,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:212:    1,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:213:    'QUEUED',
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:214:    p_content_id || ':RUN-' || v_run_no || ':' || m.modu
+le_code || ':ATTEMPT-1',
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:215:    jsonb_build_object(
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:216:      'content_id', p_content_id,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:217:      'run_no', v_run_no,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:218:      'run_mode', v_content.run_mode,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:219:      'module_code', m.module_code,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:220:      'timezone', v_project.timezone
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:221:    ) || coalesce(p_input_payload, '{}'::jsonb)
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:222:  from public.geef_modules m
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:223:  where m.project_id = v_content.project_id
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:224:    and m.is_active
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:225:    and m.sequence_no between v_start_sequence and v_end
+_sequence
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:242:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:243:-- -----------------------------------------------------
+----------------------
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:244:-- 2. Mark a queued module as running
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:245:-- -----------------------------------------------------
+----------------------
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:246:create or replace function public.geef_begin_module(
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:247:  p_module_run_id uuid,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:248:  p_make_execution_id text default null
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:249:)
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:250:returns public.geef_module_runs
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:251:language plpgsql
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:252:security invoker
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:253:set search_path = public
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:254:as $$
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:255:declare
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:256:  v_module_run public.geef_module_runs;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:257:  v_module_code text;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:258:  v_content_uuid uuid;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:259:begin
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:260:  select mr.* into v_module_run
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:261:  from public.geef_module_runs mr
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:262:  where mr.id = p_module_run_id
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:263:  for update;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:264:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:265:  if not found then
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:266:    raise exception 'Module run not found: %', p_module_
+run_id;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:267:  end if;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:268:
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:269:  if v_module_run.status <> 'QUEUED' then
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:270:    raise exception 'Module run % is %, expected QUEUED'
+,
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:271:      p_module_run_id, v_module_run.status;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:272:  end if;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:273:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:274:  select m.module_code, w.content_uuid
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:275:    into v_module_code, v_content_uuid
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:276:  from public.geef_modules m
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:277:  join public.geef_workflow_runs w on w.id = v_module_ru
+n.workflow_run_id
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:278:  where m.id = v_module_run.module_id;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:279:
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:280:  update public.geef_module_runs
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:281:  set status = 'RUNNING',
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:282:      make_execution_id = coalesce(p_make_execution_id, 
+make_execution_id),
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:283:      started_at = coalesce(started_at, now()),
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:284:      error_code = null,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:285:      error_message = null
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:286:  where id = p_module_run_id
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:287:  returning * into v_module_run;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:288:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:289:  update public.geef_workflow_runs
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:290:  set status = 'RUNNING',
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:291:      started_at = coalesce(started_at, now())
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:292:  where id = v_module_run.workflow_run_id
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:293:    and status = 'QUEUED';
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:294:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:295:  update public.geef_contents
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:296:  set status = 'IN_PRODUCTION', current_module_code = v_
+module_code
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:297:  where id = v_content_uuid;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:298:
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:299:  return v_module_run;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:300:end;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:301:$$;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:302:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:303:-- -----------------------------------------------------
+----------------------
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:304:-- 3. Finish a module and roll up workflow/content statu
+s
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:305:-- -----------------------------------------------------
+----------------------
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:306:create or replace function public.geef_finish_module(
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:307:  p_module_run_id uuid,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:308:  p_succeeded boolean,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:309:  p_output_payload jsonb default '{}'::jsonb,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:310:  p_error_code text default null,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:311:  p_error_message text default null
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:312:)
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:313:returns public.geef_module_runs
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:314:language plpgsql
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:315:security invoker
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:316:set search_path = public
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:317:as $$
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:318:declare
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:319:  v_module_run public.geef_module_runs;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:320:  v_content_uuid uuid;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:321:  v_next_module_code text;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:322:  v_end_module_code text;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:323:  v_failed_count integer;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:324:  v_open_count integer;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:325:begin
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:326:  select mr.* into v_module_run
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:327:  from public.geef_module_runs mr
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:328:  where mr.id = p_module_run_id
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:329:  for update;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:330:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:331:  if not found then
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:332:    raise exception 'Module run not found: %', p_module_
+run_id;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:333:  end if;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:334:
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:335:  if v_module_run.status <> 'RUNNING' then
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:336:    raise exception 'Module run % is %, expected RUNNING
+',
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:337:      p_module_run_id, v_module_run.status;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:338:  end if;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:339:
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:340:  update public.geef_module_runs
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:341:  set status = case when p_succeeded then 'SUCCEEDED' el
+se 'FAILED' end,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:342:      finished_at = now(),
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:343:      duration_ms = greatest(
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:344:        0,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:345:        floor(extract(epoch from (now() - coalesce(start
+ed_at, now()))) * 1000)::integer
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:346:      ),
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:347:      output_payload = coalesce(p_output_payload, '{}'::
+jsonb),
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:348:      error_code = case when p_succeeded then null else 
+coalesce(p_error_code, 'MODULE_FAILED') end,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:349:      error_message = case when p_succeeded then null el
+se coalesce(p_error_message, 'Module execution failed') end
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:350:  where id = p_module_run_id
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:351:  returning * into v_module_run;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:352:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:353:  select w.content_uuid, w.end_module_code into v_conten
+t_uuid, v_end_module_code
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:354:  from public.geef_workflow_runs w
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:355:  where w.id = v_module_run.workflow_run_id;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:356:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:357:  select count(*) filter (where mr.status = 'FAILED'),
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:358:         count(*) filter (where mr.status in ('QUEUED', 
+'RUNNING'))
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:359:    into v_failed_count, v_open_count
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:360:  from public.geef_module_runs mr
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:361:  where mr.workflow_run_id = v_module_run.workflow_run_i
+d;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:362:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:363:  if not p_succeeded then
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:364:    update public.geef_module_runs
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:365:    set status = 'SKIPPED',
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:366:        finished_at = now(),
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:367:        error_code = 'UPSTREAM_FAILED',
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:368:        error_message = 'Skipped because an upstream mod
+ule failed'
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:369:    where workflow_run_id = v_module_run.workflow_run_id
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:370:      and status = 'QUEUED';
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:371:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:372:    update public.geef_workflow_runs
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:373:    set status = 'FAILED', finished_at = now(),
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:374:        error_code = coalesce(p_error_code, 'MODULE_FAIL
+ED'),
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:375:        error_message = coalesce(p_error_message, 'Modul
+e execution failed')
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:376:    where id = v_module_run.workflow_run_id;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:377:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:378:    update public.geef_contents
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:379:    set status = 'FAILED', error_summary = coalesce(p_er
+ror_message, 'Module execution failed')
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:380:    where id = v_content_uuid;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:381:  elsif v_open_count = 0 then
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:382:    update public.geef_workflow_runs
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:383:    set status = case when v_failed_count = 0 then 'SUCC
+EEDED' else 'PARTIAL_FAILURE' end,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:384:        finished_at = now(),
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:385:        error_code = null,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:386:        error_message = null
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:387:    where id = v_module_run.workflow_run_id;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:388:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:389:    update public.geef_contents
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:390:    set status = case
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:391:          when v_failed_count > 0 then 'FAILED'::public.
+geef_content_status
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:392:          when v_end_module_code = 'EF-17' then 'CANDIDA
+TE'::public.geef_content_status
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:393:          else 'PLANNED'::public.geef_content_status
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:394:        end,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:395:        current_module_code = null,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:396:        error_summary = case when v_failed_count = 0 the
+n null else error_summary end
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:397:    where id = v_content_uuid;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:398:  else
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:399:    select m.module_code into v_next_module_code
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:400:    from public.geef_module_runs mr
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:401:    join public.geef_modules m on m.id = mr.module_id
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:402:    where mr.workflow_run_id = v_module_run.workflow_run
+_id
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:403:      and mr.status = 'QUEUED'
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:404:    order by m.sequence_no
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:405:    limit 1;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:406:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:407:    update public.geef_contents
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:408:    set current_module_code = v_next_module_code
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:409:    where id = v_content_uuid;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:410:  end if;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:411:
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:412:  return v_module_run;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:413:end;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:414:$$;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:415:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:416:-- -----------------------------------------------------
+----------------------
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:417:-- 4. Create a new workflow from a failed module (histor
+y is preserved)
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:418:-- -----------------------------------------------------
+----------------------
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:419:create or replace function public.geef_retry_failed_modu
+le(
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:420:  p_failed_module_run_id uuid,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:421:  p_triggered_by text default 'MANUAL_RETRY',
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:422:  p_input_payload jsonb default '{}'::jsonb
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:423:)
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:424:returns public.geef_workflow_runs
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:425:language plpgsql
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:426:security invoker
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:427:set search_path = public
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:428:as $$
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:429:declare
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:430:  v_failed public.geef_module_runs;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:431:  v_content_id text;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:432:  v_module_code text;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:433:  v_parent_run_id uuid;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:434:  v_retry_count integer;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:435:  v_retry_limit integer;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:436:begin
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:437:  -- A composite row variable cannot share a multi-item 
+INTO target list.
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:438:  -- Load the module-run row first, then load its scalar
+ retry limit separately.
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:439:  select mr.*
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:440:    into v_failed
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:441:  from public.geef_module_runs mr
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:442:  where mr.id = p_failed_module_run_id;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:443:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:444:  if not found then
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:445:    raise exception 'Failed module run not found: %', p_
+failed_module_run_id;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:446:  end if;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:447:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:448:  if v_failed.status <> 'FAILED' then
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:449:    raise exception 'Module run % is %, expected FAILED'
+,
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:450:      p_failed_module_run_id, v_failed.status;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:451:  end if;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:452:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:453:  select m.retry_limit
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:454:    into v_retry_limit
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:455:  from public.geef_modules m
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:456:  where m.id = v_failed.module_id;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:457:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:458:  if not found then
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:459:    raise exception 'Module definition not found for mod
+ule run: %',
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:460:      p_failed_module_run_id;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:461:  end if;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:462:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:463:  select c.content_id, m.module_code, coalesce(w.parent_
+run_id, w.id)
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:464:    into v_content_id, v_module_code, v_parent_run_id
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:465:  from public.geef_workflow_runs w
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:466:  join public.geef_contents c on c.id = w.content_uuid
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:467:  join public.geef_modules m on m.id = v_failed.module_i
+d
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:468:  where w.id = v_failed.workflow_run_id;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:469:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:470:  select count(*) into v_retry_count
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:471:  from public.geef_workflow_runs w
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:472:  where w.parent_run_id = v_parent_run_id
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:473:    and w.start_module_code = v_module_code;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:474:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:475:  if v_retry_count >= v_retry_limit then
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:476:    raise exception 'Retry limit % reached for module %'
+, v_retry_limit, v_module_code;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:477:  end if;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:478:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:479:  return public.geef_start_workflow(
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:480:    v_content_id,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:481:    v_module_code,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:482:    'EF-17',
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:483:    p_triggered_by,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:484:    jsonb_build_object(
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:485:      'retry_of_module_run_id', p_failed_module_run_id,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:486:      'retry_number', v_retry_count + 1
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:487:    ) || coalesce(p_input_payload, '{}'::jsonb),
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:488:    v_parent_run_id
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:489:  );
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:490:end;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:491:$$;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:492:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:493:-- -----------------------------------------------------
+----------------------
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:494:-- 5. Read model for Make.com / admin monitoring
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:495:-- -----------------------------------------------------
+----------------------
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:496:create or replace view public.geef_execution_queue_v as
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:497:select
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:498:  c.content_id,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:499:  c.target_date,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:500:  c.run_mode,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:501:  c.status as content_status,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:502:  w.id as workflow_run_id,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:503:  w.run_no,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:504:  w.status as workflow_status,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:505:  w.correlation_id,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:506:  m.module_code,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:507:  m.module_name,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:508:  m.sequence_no,
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:509:  mr.id as module_run_id,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:510:  mr.attempt_no,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:511:  mr.status as module_status,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:512:  mr.idempotency_key,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:513:  mr.started_at,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:514:  mr.finished_at,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:515:  mr.error_code,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:516:  mr.error_message
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:517:from public.geef_contents c
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:518:join public.geef_workflow_runs w on w.content_uuid = c.i
+d
+> db\GEEF_02-01-02_ef00_execution_control(2).sql:519:join public.geef_module_runs mr on mr.workflow_run_id = 
+w.id
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:520:join public.geef_modules m on m.id = mr.module_id;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:521:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:522:grant select on public.geef_execution_queue_v to authent
+icated;
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:523:
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:524:-- -----------------------------------------------------
+----------------------
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:525:-- 6. Submit an idempotent EF-00 execution request
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:526:-- -----------------------------------------------------
+----------------------
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:527:create or replace function public.geef_request_execution
+(
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:528:  p_content_id text,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:529:  p_request_key text,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:530:  p_start_module_code text default 'EF-00',
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:531:  p_end_module_code text default 'EF-17',
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:532:  p_requested_by text default 'SYSTEM',
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:533:  p_priority smallint default 100,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:534:  p_request_payload jsonb default '{}'::jsonb,
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:535:  p_available_at timestamptz default now()
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:536:)
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:537:returns public.geef_execution_requests
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:538:language plpgsql
+  db\GEEF_02-01-02_ef00_execution_control(2).sql:539:security definer
+  db\GEEF_02-01-03_ef00_smoke_test.sql:10:do $$
+  db\GEEF_02-01-03_ef00_smoke_test.sql:11:declare
+  db\GEEF_02-01-03_ef00_smoke_test.sql:12:  v_content public.geef_contents;
+  db\GEEF_02-01-03_ef00_smoke_test.sql:13:  v_request public.geef_execution_requests;
+  db\GEEF_02-01-03_ef00_smoke_test.sql:14:  v_attempt public.geef_execution_attempts;
+> db\GEEF_02-01-03_ef00_smoke_test.sql:15:  v_module_run public.geef_module_runs;
+> db\GEEF_02-01-03_ef00_smoke_test.sql:16:  v_finished_module public.geef_module_runs;
+  db\GEEF_02-01-03_ef00_smoke_test.sql:17:  v_completed_request public.geef_execution_requests;
+  db\GEEF_02-01-03_ef00_smoke_test.sql:18:  v_workflow_status public.geef_run_status;
+  db\GEEF_02-01-03_ef00_smoke_test.sql:19:  v_content_status public.geef_content_status;
+  db\GEEF_02-01-03_ef00_smoke_test.sql:20:  v_history_count integer;
+  db\GEEF_02-01-03_ef00_smoke_test.sql:21:  v_request_key text;
+  db\GEEF_02-01-03_ef00_smoke_test.sql:22:  v_worker_id constant text := 'GEEF_SQL_SMOKE_WORKER';
+  db\GEEF_02-01-03_ef00_smoke_test.sql:23:begin
+  db\GEEF_02-01-03_ef00_smoke_test.sql:24:  -- 0. Fail early if either prerequisite is missing or incomplete.
+  db\GEEF_02-01-03_ef00_smoke_test.sql:25:  if to_regprocedure('public.geef_create_content(text,date,public.g
+eef_run_mode,jsonb)') is null
+  db\GEEF_02-01-03_ef00_smoke_test.sql:26:     or to_regprocedure('public.geef_request_execution(text,text,te
+xt,text,text,smallint,jsonb,timestamptz)') is null
+  db\GEEF_02-01-03_ef00_smoke_test.sql:27:     or to_regprocedure('public.geef_claim_execution(text,integer)'
+) is null
+  db\GEEF_02-01-03_ef00_smoke_test.sql:28:     or to_regprocedure('public.geef_heartbeat_execution(uuid,integ
+er)') is null
+  db\GEEF_02-01-03_ef00_smoke_test.sql:29:     or to_regprocedure('public.geef_complete_execution(uuid,boolea
+n,jsonb,text,text)') is null then
+  db\GEEF_02-01-03_ef00_smoke_test.sql:30:    raise exception 'GEEF 02-01-01 or 02-01-02 prerequisite is inco
+mplete';
+  db\GEEF_02-01-03_ef00_smoke_test.sql:31:  end if;
+  db\GEEF_02-01-03_ef00_smoke_test.sql:32:
+  db\GEEF_02-01-03_ef00_smoke_test.sql:33:  -- 1. Create an isolated TEST content. The issuer selects the nex
+t daily sequence.
+  db\GEEF_02-01-03_ef00_smoke_test.sql:34:  v_content := public.geef_create_content(
+  db\GEEF_02-01-03_ef00_smoke_test.sql:35:    'GEEF_ENTERTAINMENT_FACTORY'::text,
+  db\GEEF_02-01-03_ef00_smoke_test.sql:36:    current_date::date,
+  db\GEEF_02-01-03_ef00_smoke_test.sql:69:
+  db\GEEF_02-01-03_ef00_smoke_test.sql:70:  -- 4. Renew the worker lease once.
+  db\GEEF_02-01-03_ef00_smoke_test.sql:71:  v_attempt := public.geef_heartbeat_execution(v_attempt.lease_toke
+n, 900);
+  db\GEEF_02-01-03_ef00_smoke_test.sql:72:
+  db\GEEF_02-01-03_ef00_smoke_test.sql:73:  -- 5. Find and begin the EF-00 module created by the claim.
+> db\GEEF_02-01-03_ef00_smoke_test.sql:74:  select mr.* into v_module_run
+> db\GEEF_02-01-03_ef00_smoke_test.sql:75:  from public.geef_module_runs mr
+  db\GEEF_02-01-03_ef00_smoke_test.sql:76:  join public.geef_modules m on m.id = mr.module_id
+  db\GEEF_02-01-03_ef00_smoke_test.sql:77:  where mr.workflow_run_id = v_request.workflow_run_id
+  db\GEEF_02-01-03_ef00_smoke_test.sql:78:    and m.module_code = 'EF-00';
+  db\GEEF_02-01-03_ef00_smoke_test.sql:79:
+  db\GEEF_02-01-03_ef00_smoke_test.sql:80:  -- v_request was returned before claim; refresh the workflow id w
+ritten by claim.
+  db\GEEF_02-01-03_ef00_smoke_test.sql:81:  if not found then
+  db\GEEF_02-01-03_ef00_smoke_test.sql:82:    select r.* into v_request
+  db\GEEF_02-01-03_ef00_smoke_test.sql:83:    from public.geef_execution_requests r
+  db\GEEF_02-01-03_ef00_smoke_test.sql:84:    where r.id = v_attempt.request_id;
+  db\GEEF_02-01-03_ef00_smoke_test.sql:85:
+> db\GEEF_02-01-03_ef00_smoke_test.sql:86:    select mr.* into v_module_run
+> db\GEEF_02-01-03_ef00_smoke_test.sql:87:    from public.geef_module_runs mr
+  db\GEEF_02-01-03_ef00_smoke_test.sql:88:    join public.geef_modules m on m.id = mr.module_id
+  db\GEEF_02-01-03_ef00_smoke_test.sql:89:    where mr.workflow_run_id = v_request.workflow_run_id
+  db\GEEF_02-01-03_ef00_smoke_test.sql:90:      and m.module_code = 'EF-00';
+  db\GEEF_02-01-03_ef00_smoke_test.sql:91:  end if;
+  db\GEEF_02-01-03_ef00_smoke_test.sql:92:
+  db\GEEF_02-01-03_ef00_smoke_test.sql:93:  if not found then
+  db\GEEF_02-01-03_ef00_smoke_test.sql:94:    raise exception 'EF-00 module queue was not created for request
+ %', v_request.id;
+  db\GEEF_02-01-03_ef00_smoke_test.sql:95:  end if;
+  db\GEEF_02-01-03_ef00_smoke_test.sql:96:
+> db\GEEF_02-01-03_ef00_smoke_test.sql:97:  v_module_run := public.geef_begin_module(
+> db\GEEF_02-01-03_ef00_smoke_test.sql:98:    v_module_run.id,
+  db\GEEF_02-01-03_ef00_smoke_test.sql:99:    'SQL-SMOKE-' || v_attempt.id::text
+  db\GEEF_02-01-03_ef00_smoke_test.sql:100:  );
+  db\GEEF_02-01-03_ef00_smoke_test.sql:101:
+> db\GEEF_02-01-03_ef00_smoke_test.sql:102:  if v_module_run.status <> 'RUNNING' then
+> db\GEEF_02-01-03_ef00_smoke_test.sql:103:    raise exception 'Module begin assertion failed: got %', v_modu
+le_run.status;
+  db\GEEF_02-01-03_ef00_smoke_test.sql:104:  end if;
+  db\GEEF_02-01-03_ef00_smoke_test.sql:105:
+  db\GEEF_02-01-03_ef00_smoke_test.sql:106:  -- 6. Finish EF-00 successfully; this rolls up workflow/content 
+state.
+  db\GEEF_02-01-03_ef00_smoke_test.sql:107:  v_finished_module := public.geef_finish_module(
+> db\GEEF_02-01-03_ef00_smoke_test.sql:108:    v_module_run.id,
+  db\GEEF_02-01-03_ef00_smoke_test.sql:109:    true,
+  db\GEEF_02-01-03_ef00_smoke_test.sql:110:    jsonb_build_object(
+  db\GEEF_02-01-03_ef00_smoke_test.sql:111:      'smoke_test', 'passed',
+  db\GEEF_02-01-03_ef00_smoke_test.sql:112:      'module_code', 'EF-00',
+  db\GEEF_02-01-03_ef00_smoke_test.sql:113:      'worker_id', v_worker_id
+  db\GEEF_02-01-03_ef00_smoke_test.sql:114:    ),
+  db\GEEF_02-01-03_ef00_smoke_test.sql:115:    null,
+  db\GEEF_02-01-03_ef00_smoke_test.sql:116:    null
+  db\GEEF_02-01-03_ef00_smoke_test.sql:117:  );
+  db\GEEF_02-01-03_ef00_smoke_test.sql:118:
+  db\GEEF_02-01-03_ef00_smoke_test.sql:119:  -- 7. Complete the execution-control request with the same succe
+ssful outcome.
+  db\GEEF_02-01-03_ef00_smoke_test.sql:120:  v_completed_request := public.geef_complete_execution(
+  db\GEEF_02-01-03_ef00_smoke_test.sql:121:    v_attempt.lease_token,
+  db\GEEF_02-01-03_ef00_smoke_test.sql:122:    true,
+  db\GEEF_02-01-03_ef00_smoke_test.sql:123:    jsonb_build_object(
+  db\GEEF_02-01-03_ef00_smoke_test.sql:124:      'smoke_test', 'passed',
+  db\GEEF_02-01-03_ef00_smoke_test.sql:125:      'content_id', v_content.content_id,
+  db\GEEF_02-01-03_ef00_smoke_test.sql:126:      'workflow_run_id', v_request.workflow_run_id
+  db\GEEF_02-01-03_ef00_smoke_test.sql:127:    ),
+  db\GEEF_02-01-03_ef00_smoke_test.sql:128:    null,
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:4:-- Safe to run repeatedly after GEEF_02-01-02 FINAL v1.0.0.
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:5:
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:6:begin;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:7:
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:8:create or replace function public.geef_finish_module(
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:9:  p_module_run_id uuid,
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:10:  p_succeeded boolean,
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:11:  p_output_payload jsonb default '{}'::jsonb,
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:12:  p_error_code text default null,
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:13:  p_error_message text default null
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:14:)
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:15:returns public.geef_module_runs
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:16:language plpgsql
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:17:security invoker
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:18:set search_path = public
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:19:as $$
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:20:declare
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:21:  v_module_run public.geef_module_runs;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:22:  v_content_uuid uuid;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:23:  v_next_module_code text;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:24:  v_end_module_code text;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:25:  v_failed_count integer;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:26:  v_open_count integer;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:27:begin
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:28:  select mr.* into v_module_run
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:29:  from public.geef_module_runs mr
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:30:  where mr.id = p_module_run_id
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:31:  for update;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:32:
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:33:  if not found then
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:34:    raise exception 'Module run not found: %', p_module_ru
+n_id;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:35:  end if;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:36:
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:37:  if v_module_run.status <> 'RUNNING' then
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:38:    raise exception 'Module run % is %, expected RUNNING',
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:39:      p_module_run_id, v_module_run.status;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:40:  end if;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:41:
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:42:  update public.geef_module_runs
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:43:  set status = case
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:44:        when p_succeeded then 'SUCCEEDED'::public.geef_run
+_status
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:45:        else 'FAILED'::public.geef_run_status
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:46:      end,
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:47:      finished_at = now(),
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:48:      duration_ms = greatest(
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:49:        0,
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:50:        floor(extract(epoch from (now() - coalesce(started
+_at, now()))) * 1000)::integer
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:51:      ),
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:52:      output_payload = coalesce(p_output_payload, '{}'::js
+onb),
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:53:      error_code = case when p_succeeded then null else co
+alesce(p_error_code, 'MODULE_FAILED') end,
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:54:      error_message = case when p_succeeded then null else
+ coalesce(p_error_message, 'Module execution failed') end
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:55:  where id = p_module_run_id
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:56:  returning * into v_module_run;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:57:
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:58:  select w.content_uuid, w.end_module_code into v_content_
+uuid, v_end_module_code
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:59:  from public.geef_workflow_runs w
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:60:  where w.id = v_module_run.workflow_run_id;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:61:
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:62:  select count(*) filter (where mr.status = 'FAILED'),
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:63:         count(*) filter (where mr.status in ('QUEUED', 'R
+UNNING'))
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:64:    into v_failed_count, v_open_count
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:65:  from public.geef_module_runs mr
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:66:  where mr.workflow_run_id = v_module_run.workflow_run_id;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:67:
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:68:  if not p_succeeded then
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:69:    update public.geef_module_runs
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:70:    set status = 'SKIPPED',
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:71:        finished_at = now(),
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:72:        error_code = 'UPSTREAM_FAILED',
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:73:        error_message = 'Skipped because an upstream modul
+e failed'
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:74:    where workflow_run_id = v_module_run.workflow_run_id
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:75:      and status = 'QUEUED';
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:76:
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:77:    update public.geef_workflow_runs
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:78:    set status = 'FAILED', finished_at = now(),
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:79:        error_code = coalesce(p_error_code, 'MODULE_FAILED
+'),
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:80:        error_message = coalesce(p_error_message, 'Module 
+execution failed')
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:81:    where id = v_module_run.workflow_run_id;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:82:
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:83:    update public.geef_contents
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:84:    set status = 'FAILED', error_summary = coalesce(p_erro
+r_message, 'Module execution failed')
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:85:    where id = v_content_uuid;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:86:  elsif v_open_count = 0 then
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:87:    update public.geef_workflow_runs
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:88:    set status = case
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:89:          when v_failed_count = 0 then 'SUCCEEDED'::public
+.geef_run_status
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:90:          else 'PARTIAL_FAILURE'::public.geef_run_status
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:91:        end,
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:92:        finished_at = now(),
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:93:        error_code = null,
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:94:        error_message = null
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:95:    where id = v_module_run.workflow_run_id;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:96:
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:97:    update public.geef_contents
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:98:    set status = case
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:99:          when v_failed_count > 0 then 'FAILED'::public.ge
+ef_content_status
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:100:          when v_end_module_code = 'EF-17' then 'CANDIDAT
+E'::public.geef_content_status
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:101:          else 'PLANNED'::public.geef_content_status
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:102:        end,
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:103:        current_module_code = null,
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:104:        error_summary = case when v_failed_count = 0 then
+ null else error_summary end
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:105:    where id = v_content_uuid;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:106:  else
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:107:    select m.module_code into v_next_module_code
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:108:    from public.geef_module_runs mr
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:109:    join public.geef_modules m on m.id = mr.module_id
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:110:    where mr.workflow_run_id = v_module_run.workflow_run_
+id
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:111:      and mr.status = 'QUEUED'
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:112:    order by m.sequence_no
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:113:    limit 1;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:114:
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:115:    update public.geef_contents
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:116:    set current_module_code = v_next_module_code
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:117:    where id = v_content_uuid;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:118:  end if;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:119:
+> db\GEEF_02-01-03_patch_finish_module_enum.sql:120:  return v_module_run;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:121:end;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:122:$$;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:123:
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:124:commit;
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:125:
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:126:-- Installation check: the function definition must conta
+in enum casts.
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:127:select
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:128:  position('SUCCEEDED''::public.geef_run_status' in pg_ge
+t_functiondef(
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:129:    'public.geef_finish_module(uuid,boolean,jsonb,text,te
+xt)'::regprocedure
+  db\GEEF_02-01-03_patch_finish_module_enum.sql:130:  )) > 0 as finish_module_enum_cast_ok;
+  db\GEEF_02-01-04_make_ef00_bridge.sql:17:as $$
+  db\GEEF_02-01-04_make_ef00_bridge.sql:18:declare
+  db\GEEF_02-01-04_make_ef00_bridge.sql:19:  v_attempt public.geef_execution_attempts;
+  db\GEEF_02-01-04_make_ef00_bridge.sql:20:  v_request public.geef_execution_requests;
+  db\GEEF_02-01-04_make_ef00_bridge.sql:21:  v_content public.geef_contents;
+> db\GEEF_02-01-04_make_ef00_bridge.sql:22:  v_module_run public.geef_module_runs;
+  db\GEEF_02-01-04_make_ef00_bridge.sql:23:  v_module_code text;
+  db\GEEF_02-01-04_make_ef00_bridge.sql:24:begin
+  db\GEEF_02-01-04_make_ef00_bridge.sql:25:  v_attempt := public.geef_claim_execution(p_worker_id, p_lease_se
+conds);
+  db\GEEF_02-01-04_make_ef00_bridge.sql:26:
+  db\GEEF_02-01-04_make_ef00_bridge.sql:27:  -- An empty queue is a normal polling result, not an exception.
+  db\GEEF_02-01-04_make_ef00_bridge.sql:28:  if v_attempt.id is null then
+  db\GEEF_02-01-04_make_ef00_bridge.sql:29:    return jsonb_build_object('claimed', false);
+  db\GEEF_02-01-04_make_ef00_bridge.sql:30:  end if;
+  db\GEEF_02-01-04_make_ef00_bridge.sql:31:
+  db\GEEF_02-01-04_make_ef00_bridge.sql:32:  select r.* into strict v_request
+  db\GEEF_02-01-04_make_ef00_bridge.sql:33:  from public.geef_execution_requests r
+  db\GEEF_02-01-04_make_ef00_bridge.sql:34:  where r.id = v_attempt.request_id;
+  db\GEEF_02-01-04_make_ef00_bridge.sql:35:
+  db\GEEF_02-01-04_make_ef00_bridge.sql:36:  select c.* into strict v_content
+  db\GEEF_02-01-04_make_ef00_bridge.sql:37:  from public.geef_contents c
+  db\GEEF_02-01-04_make_ef00_bridge.sql:38:  where c.id = v_request.content_uuid;
+  db\GEEF_02-01-04_make_ef00_bridge.sql:39:
+  db\GEEF_02-01-04_make_ef00_bridge.sql:40:  select mr.*
+> db\GEEF_02-01-04_make_ef00_bridge.sql:41:    into v_module_run
+> db\GEEF_02-01-04_make_ef00_bridge.sql:42:  from public.geef_module_runs mr
+  db\GEEF_02-01-04_make_ef00_bridge.sql:43:  join public.geef_modules m on m.id = mr.module_id
+  db\GEEF_02-01-04_make_ef00_bridge.sql:44:  where mr.workflow_run_id = v_request.workflow_run_id
+  db\GEEF_02-01-04_make_ef00_bridge.sql:45:    and mr.status = 'QUEUED'
+  db\GEEF_02-01-04_make_ef00_bridge.sql:46:  order by mr.sequence_no
+  db\GEEF_02-01-04_make_ef00_bridge.sql:47:  limit 1;
+  db\GEEF_02-01-04_make_ef00_bridge.sql:48:
+> db\GEEF_02-01-04_make_ef00_bridge.sql:49:  if v_module_run.id is null then
+  db\GEEF_02-01-04_make_ef00_bridge.sql:50:    raise exception 'Claimed request % has no queued module', v_re
+quest.id;
+  db\GEEF_02-01-04_make_ef00_bridge.sql:51:  end if;
+  db\GEEF_02-01-04_make_ef00_bridge.sql:52:
+  db\GEEF_02-01-04_make_ef00_bridge.sql:53:  select m.module_code
+  db\GEEF_02-01-04_make_ef00_bridge.sql:54:    into strict v_module_code
+  db\GEEF_02-01-04_make_ef00_bridge.sql:55:  from public.geef_modules m
+> db\GEEF_02-01-04_make_ef00_bridge.sql:56:  where m.id = v_module_run.module_id;
+  db\GEEF_02-01-04_make_ef00_bridge.sql:57:
+  db\GEEF_02-01-04_make_ef00_bridge.sql:58:  return jsonb_build_object(
+  db\GEEF_02-01-04_make_ef00_bridge.sql:59:    'claimed', true,
+  db\GEEF_02-01-04_make_ef00_bridge.sql:60:    'execution_request_id', v_request.id,
+  db\GEEF_02-01-04_make_ef00_bridge.sql:61:    'execution_attempt_id', v_attempt.id,
+  db\GEEF_02-01-04_make_ef00_bridge.sql:62:    'lease_token', v_attempt.lease_token,
+  db\GEEF_02-01-04_make_ef00_bridge.sql:63:    'lease_expires_at', v_attempt.lease_expires_at,
+  db\GEEF_02-01-04_make_ef00_bridge.sql:64:    'attempt_no', v_attempt.attempt_no,
+  db\GEEF_02-01-04_make_ef00_bridge.sql:65:    'worker_id', v_attempt.worker_id,
+  db\GEEF_02-01-04_make_ef00_bridge.sql:66:    'content_uuid', v_content.id,
+  db\GEEF_02-01-04_make_ef00_bridge.sql:67:    'content_id', v_content.content_id,
+  db\GEEF_02-01-04_make_ef00_bridge.sql:68:    'run_mode', v_request.run_mode,
+  db\GEEF_02-01-04_make_ef00_bridge.sql:69:    'workflow_run_id', v_request.workflow_run_id,
+> db\GEEF_02-01-04_make_ef00_bridge.sql:70:    'module_run_id', v_module_run.id,
+  db\GEEF_02-01-04_make_ef00_bridge.sql:71:    'module_code', v_module_code,
+  db\GEEF_02-01-04_make_ef00_bridge.sql:72:    'start_module_code', v_request.start_module_code,
+  db\GEEF_02-01-04_make_ef00_bridge.sql:73:    'end_module_code', v_request.end_module_code,
+  db\GEEF_02-01-04_make_ef00_bridge.sql:74:    'request_payload', v_request.request_payload
+  db\GEEF_02-01-04_make_ef00_bridge.sql:75:  );
+  db\GEEF_02-01-04_make_ef00_bridge.sql:76:end;
+  db\GEEF_02-01-04_make_ef00_bridge.sql:77:$$;
+  db\GEEF_02-01-04_make_ef00_bridge.sql:78:
+  db\GEEF_02-01-04_make_ef00_bridge.sql:79:revoke all on function public.geef_make_claim_execution(text,integ
+er)
+  db\GEEF_02-01-04_make_ef00_bridge.sql:80:  from public, anon, authenticated;
+  db\GEEF_02-01-04_make_ef00_bridge.sql:81:grant execute on function public.geef_make_claim_execution(text,in
+teger)
+  db\GEEF_02-01-04_make_ef00_bridge.sql:82:  to service_role;
+  db\GEEF_02-01-04_make_ef00_bridge.sql:83:
+  db\GEEF_02-01-04_make_ef00_bridge.sql:84:commit;
+  db\GEEF_02-01-04_make_ef00_bridge.sql:85:
+  db\GEEF_02-01-04_make_ef00_bridge.sql:86:select jsonb_build_object(
+  db\GEEF_02-01-04_make_ef00_bridge.sql:87:  'release', 'FINAL v1.0.0',
+  db\GEEF_02-01-04_make_ef00_bridge.sql:88:  'make_claim_rpc_ok',
+  db\GEEF_02-01-04_make_ef00_bridge.sql:89:    to_regprocedure('public.geef_make_claim_execution(text,integer
+)') is not null
+  db\GEEF_02-01-04_make_ef00_bridge.sql:90:) as geef_02_01_04_installation;
+
+

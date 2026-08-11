@@ -1,0 +1,380 @@
+﻿import logging
+import os
+import time
+from pathlib import Path
+from typing import Any
+
+import requests
+from dotenv import load_dotenv
+from flask import Flask, jsonify, request
+
+
+# ============================================================
+# ?섍꼍蹂??濡쒕뱶
+# ============================================================
+
+BASE_DIR = Path(__file__).resolve().parent
+
+load_dotenv(
+    BASE_DIR / ".env",
+    override=True,
+)
+
+
+# ============================================================
+# 濡쒓퉭 ?ㅼ젙
+# ============================================================
+
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(message)s",
+)
+
+logger = logging.getLogger("geef-worker")
+
+
+# ============================================================
+# Flask ?좏뵆由ъ??댁뀡
+# ============================================================
+
+app = Flask(__name__)
+
+
+# ============================================================
+# 怨듯넻 ?좏떥由ы떚
+# ============================================================
+
+def env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name, str(default))
+
+    return value.strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def first_row(value: Any) -> Any:
+    """
+    Supabase RPC媛 ?⑥씪 ?됱쓣 諛곗뿴濡?諛섑솚?섎뒗 寃쎌슦
+    泥?踰덉㎏ ?됰쭔 諛섑솚?⑸땲??
+    """
+
+    if isinstance(value, list):
+        return value[0] if value else None
+
+    return value
+
+
+def get_content_id(job: dict[str, Any]) -> str | None:
+    input_payload = job.get("input_payload") or {}
+
+    return (
+        job.get("content_id")
+        or input_payload.get("content_id")
+    )
+
+
+# ============================================================
+# Supabase REST/RPC ?대씪?댁뼵??
+# ============================================================
+
+class SupabaseClient:
+    def __init__(self) -> None:
+        self.url = os.getenv(
+            "SUPABASE_URL",
+            "",
+        ).rstrip("/")
+
+        self.key = os.getenv(
+            "SUPABASE_SERVICE_ROLE_KEY",
+            "",
+        )
+
+        self.timeout = int(
+            os.getenv(
+                "HTTP_TIMEOUT_SECONDS",
+                "30",
+            )
+        )
+
+    def configured(self) -> bool:
+        return bool(
+            self.url
+            and self.key
+        )
+
+    def rpc(
+        self,
+        function_name: str,
+        payload: dict[str, Any],
+    ) -> Any:
+        if not self.configured():
+            raise RuntimeError(
+                "SUPABASE_URL and "
+                "SUPABASE_SERVICE_ROLE_KEY are required"
+            )
+
+        response = requests.post(
+            f"{self.url}/rest/v1/rpc/{function_name}",
+            headers={
+                "apikey": self.key,
+                "Authorization": f"Bearer {self.key}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            json=payload,
+            timeout=self.timeout,
+        )
+
+        if not response.ok:
+            raise RuntimeError(
+                f"RPC {function_name} failed "
+                f"({response.status_code}): "
+                f"{response.text[:1000]}"
+            )
+
+        if (
+            response.status_code == 204
+            or not response.text.strip()
+        ):
+            return None
+
+        return response.json()
+
+
+supabase = SupabaseClient()
+
+
+# ============================================================
+# EF-01 Context ?앹꽦
+# ============================================================
+
+def build_context(
+    job: dict[str, Any],
+) -> dict[str, Any]:
+    source = (
+        job.get("context")
+        or job.get("input_payload")
+        or {}
+    )
+
+    return {
+        "language": source.get(
+            "language",
+            "ko",
+        ),
+        "genre": source.get(
+            "genre",
+            "Korean Ballad",
+        ),
+        "theme": source.get(
+            "theme",
+            source.get(
+                "title",
+                "?덈줈???쒖옉怨??곕쑜???꾨줈",
+            ),
+        ),
+        "mood": source.get(
+            "mood",
+            [
+                "?곕쑜??,
+                "?щ쭩",
+                "?꾨줈",
+            ],
+        ),
+        "target_audience": source.get(
+            "target_audience",
+            "?쒓뎅??以묒옣?꾩링",
+        ),
+        "vocal_style": source.get(
+            "vocal_style",
+            "warm and emotional",
+        ),
+        "target_duration_seconds": int(
+            source.get(
+                "target_duration_seconds",
+                210,
+            )
+        ),
+        "tempo_bpm": int(
+            source.get(
+                "tempo_bpm",
+                76,
+            )
+        ),
+        "instrument_style": source.get(
+            "instrument_style",
+            "acoustic guitar, piano, soft strings",
+        ),
+        "arrangement_style": source.get(
+            "arrangement_style",
+            "verse-pre-chorus-bridge-final",
+        ),
+        "mix_style": source.get(
+            "mix_style",
+            "warm, clear vocal, natural dynamics",
+        ),
+        "master_style": source.get(
+            "master_style",
+            "streaming-ready balanced master",
+        ),
+        "musical_key": source.get(
+            "musical_key",
+            "G Major",
+        ),
+        "time_signature": source.get(
+            "time_signature",
+            "4/4",
+        ),
+        "video_style": source.get(
+            "video_style",
+            "cinematic Korean daily-life storytelling",
+        ),
+        "aspect_ratio": source.get(
+            "aspect_ratio",
+            "16:9",
+        ),
+        "context_status": "READY",
+    }
+
+
+# ============================================================
+# 紐⑤뱢 ?곹깭 ?꾪솚
+# ============================================================
+
+def begin_module(
+    module_run_id: str,
+) -> Any:
+    execution_id = os.getenv(
+        "WORKER_ID",
+        "geef-local-worker",
+    )
+
+    result = supabase.rpc(
+        os.getenv(
+            "RPC_BEGIN_MODULE",
+            "geef_begin_module",
+        ),
+        {
+            "p_module_run_id": module_run_id,
+            "p_make_execution_id": execution_id,
+        },
+    )
+
+    return first_row(result)
+
+def finish_module(
+    module_run_id: str,
+    success: bool,
+    output_payload: dict[str, Any],
+    error_code: str | None = None,
+    error_message: str | None = None,
+) -> Any:
+    result = supabase.rpc(
+        os.getenv(
+            "RPC_FINISH_MODULE",
+            "geef_finish_module",
+        ),
+        {
+            "p_module_run_id": module_run_id,
+            "p_succeeded": success,
+            "p_output_payload": output_payload,
+            "p_error_code": error_code,
+            "p_error_message": error_message,
+        },
+    )
+
+    return first_row(result)
+
+
+# ============================================================
+# EF-01 ?ㅽ뻾
+# ============================================================
+
+def run_ef01(
+    job: dict[str, Any],
+) -> dict[str, Any]:
+    required_fields = [
+        "content_uuid",
+        "workflow_run_id",
+        "module_run_id",
+    ]
+
+    missing_fields = [
+        field
+        for field in required_fields
+        if not job.get(field)
+    ]
+
+    if missing_fields:
+        raise ValueError(
+            "Missing required fields: "
+            + ", ".join(missing_fields)
+        )
+
+    context = build_context(job)
+
+    # DRY RUN?먯꽌??DB? module_run ?곹깭瑜?蹂寃쏀븯吏 ?딆뒿?덈떎.
+    if env_bool("DRY_RUN", True):
+        return {
+            "dry_run": True,
+            "module_code": "EF-01",
+            "context": context,
+        }
+
+    module_run_id = job["module_run_id"]
+    content_id = get_content_id(job)
+
+    module_started = False
+
+    try:
+        # QUEUED ??RUNNING
+        started_module = begin_module(
+            module_run_id,
+        )
+
+        module_started = True
+
+        logger.info(
+            "EF-01 module started: "
+            "module_run_id=%s content_id=%s",
+            module_run_id,
+            content_id,
+        )
+
+        # Project Context ???
+        saved_context_result = supabase.rpc(
+            os.getenv(
+                "RPC_SAVE_CONTEXT",
+                "geef_save_project_context",
+            ),
+            {
+                "p_content_uuid": job["content_uuid"],
+                "p_workflow_run_id": job["workflow_run_id"],
+                "p_module_run_id": module_run_id,
+                "p_context": context,
+            },
+        )
+
+        saved_context = first_row(
+            saved_context_result
+        )
+
+        output_payload = {
+            "module_code": "EF-01",
+            "content_id": content_id,
+            "content_uuid": job["content_uuid"],
+            "workflow_run_id": job["workflow_run_id"],
+            "module_run_id": module_run_id,
+            "context_status": "READY",
+            "saved_context": saved_context,
+        }
+
+        # RUNNING ??SUCCEEDED
+        finished_module = finish_module(
+            module_run_id=module_run_id,
+            success=True,
+            output_payload=output_payload,
+            error_code=None,

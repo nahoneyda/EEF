@@ -1,0 +1,767 @@
+﻿===== PACKAGE.JSON =====
+{
+  "name": "nest-app",
+  "version": "0.0.1",
+  "description": "",
+  "author": "",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "nest build",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+    "test:e2e": "jest --config ./test/jest-e2e.json"
+  },
+  "dependencies": {
+    "@google/genai": "^2.16.0",
+    "@nestjs/common": "^11.0.1",
+    "@nestjs/config": "^4.0.4",
+    "@nestjs/core": "^11.0.1",
+    "@nestjs/event-emitter": "^3.1.0",
+    "@nestjs/platform-express": "^11.0.1",
+    "@supabase/supabase-js": "^2.112.2",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.2.0",
+    "@eslint/js": "^9.18.0",
+    "@nestjs/cli": "^11.0.0",
+    "@nestjs/schematics": "^11.0.0",
+    "@nestjs/testing": "^11.0.1",
+    "@types/express": "^5.0.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.0.0",
+    "@types/supertest": "^7.0.0",
+    "eslint": "^9.18.0",
+    "eslint-config-prettier": "^10.0.1",
+    "eslint-plugin-prettier": "^5.2.2",
+    "globals": "^17.0.0",
+    "jest": "^30.0.0",
+    "prettier": "^3.4.2",
+    "source-map-support": "^0.5.21",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.5",
+    "ts-loader": "^9.5.2",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.20.0"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node"
+  }
+}
+
+===== APP MODULE =====
+import { Module } from '@nestjs/common';
+
+import { ConfigModule } from '@nestjs/config';
+
+import { AppController } from './app.controller';
+
+import { AppService } from './app.service';
+
+import { SupabaseModule } from './common/supabase/supabase.module';
+
+import { WorkflowModule } from './common/workflow/workflow.module';
+
+import { Ef01ContextModule } from './modules/ef01-context/module/ef01-context.module';
+import { WorkerModule } from './common/worker/worker.module';
+import { EventsModule } from './common/events/events.module';
+import { AiModule } from './common/ai/ai.module';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+
+      envFilePath: '.env',
+    }),
+
+    SupabaseModule,
+
+    WorkflowModule,
+
+    Ef01ContextModule,
+    WorkerModule,
+    EventsModule,
+    AiModule,
+  ],
+
+  controllers: [AppController],
+
+  providers: [AppService],
+})
+export class AppModule {}
+
+===== MODULE DIRECTORIES =====
+D:\myProject\chatGpt\EEF\nest-app\src\modules\ef01-context
+D:\myProject\chatGpt\EEF\nest-app\src\modules\ef02-lyrics
+D:\myProject\chatGpt\EEF\nest-app\src\modules\ef03-music-spec
+D:\myProject\chatGpt\EEF\nest-app\src\modules\ef04-composition-plan
+D:\myProject\chatGpt\EEF\nest-app\src\modules\ef05-provider-package
+D:\myProject\chatGpt\EEF\nest-app\src\modules\ef06-audio-generation
+
+===== EF06 FILE LIST =====
+D:\myProject\chatGpt\EEF\nest-app\src\modules\ef06-audio-generation\application\executors\ef06-audio-generation.executor.ts
+D:\myProject\chatGpt\EEF\nest-app\src\modules\ef06-audio-generation\application\use-cases\generate-audio.use-case.ts
+D:\myProject\chatGpt\EEF\nest-app\src\modules\ef06-audio-generation\domain\entities\audio-generation.entity.ts
+D:\myProject\chatGpt\EEF\nest-app\src\modules\ef06-audio-generation\domain\repositories\audio-generation.repository.ts
+D:\myProject\chatGpt\EEF\nest-app\src\modules\ef06-audio-generation\domain\services\audio-provider.service.ts
+D:\myProject\chatGpt\EEF\nest-app\src\modules\ef06-audio-generation\domain\services\audio-storage.service.ts
+D:\myProject\chatGpt\EEF\nest-app\src\modules\ef06-audio-generation\infrastructure\supabase-audio-generation.repository.ts
+D:\myProject\chatGpt\EEF\nest-app\src\modules\ef06-audio-generation\infrastructure\google\google-lyria-audio.provider.ts
+D:\myProject\chatGpt\EEF\nest-app\src\modules\ef06-audio-generation\infrastructure\storage\supabase-audio-storage.service.ts
+D:\myProject\chatGpt\EEF\nest-app\src\modules\ef06-audio-generation\module\ef06-audio-generation.module.ts
+
+===== EF06 SOURCE =====
+
+----- D:\myProject\chatGpt\EEF\nest-app\src\modules\ef06-audio-generation\application\executors\ef06-audio-generation.executor.ts -----
+import { Injectable } from '@nestjs/common';
+import { ModuleExecutionJob, ModuleExecutionResult, ModuleExecutor } from '../../../../common/worker/module-executor.interface';
+import { GenerateAudioUseCase } from '../use-cases/generate-audio.use-case';
+
+@Injectable()
+export class Ef06AudioGenerationExecutor extends ModuleExecutor {
+  readonly moduleCode='EF-06';
+  constructor(private readonly useCase:GenerateAudioUseCase){super();}
+  async execute(job:ModuleExecutionJob):Promise<ModuleExecutionResult>{
+    const r=await this.useCase.execute({
+      contentUuid:job.contentUuid,workflowRunId:job.workflowRunId,moduleRunId:job.moduleRunId,
+      runMode:typeof job.inputPayload?.run_mode==='string'?job.inputPayload.run_mode:'TEST',
+    });
+    return {moduleCode:this.moduleCode,status:'SUCCEEDED',output:{
+      contentUuid:r.contentUuid,workflowRunId:r.workflowRunId,moduleRunId:r.moduleRunId,
+      jobId:r.jobId,generationId:r.generationId,provider:r.provider,providerModel:r.providerModel,
+      audioStatus:'COMPLETED',storageBucket:r.storage.bucket,storagePath:r.storage.path,
+      audioPublicUrl:r.storage.publicUrl??null,fileSizeBytes:r.storage.fileSizeBytes,
+      generationTimeSeconds:r.generationTimeSeconds,
+    }};
+  }
+}
+
+----- D:\myProject\chatGpt\EEF\nest-app\src\modules\ef06-audio-generation\application\use-cases\generate-audio.use-case.ts -----
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { ModuleRunService } from '../../../../common/workflow/module-run/module-run.service';
+import { EventBusService } from '../../../../common/events/event-bus.service';
+import { AudioGeneratedEvent } from '../../../../common/events/events/audio-generated.event';
+import { AudioGenerationRepository } from '../../domain/repositories/audio-generation.repository';
+import { AudioProvider } from '../../domain/services/audio-provider.service';
+import { AudioStorage } from '../../domain/services/audio-storage.service';
+import { AudioGenerationResult, AudioJobType } from '../../domain/entities/audio-generation.entity';
+
+@Injectable()
+export class GenerateAudioUseCase {
+  constructor(
+    private readonly repo: AudioGenerationRepository,
+    private readonly provider: AudioProvider,
+    private readonly storage: AudioStorage,
+    private readonly moduleRun: ModuleRunService,
+    private readonly events: EventBusService,
+    private readonly config: ConfigService,
+  ) {}
+
+  async execute(req:{contentUuid:string;workflowRunId:string;moduleRunId:string;runMode?:string;}):Promise<AudioGenerationResult>{
+    await this.moduleRun.beginModule(req.moduleRunId);
+    let jobId:string|undefined, generationId:string|undefined;
+    try{
+      const pkg=await this.repo.getProviderPackage(req.contentUuid);
+      const runMode=(req.runMode??'TEST').trim().toUpperCase();
+      const prod=runMode==='PRODUCTION';
+      const model=this.config.get<string>(prod?'LYRIA_MODEL_PRODUCTION':'LYRIA_MODEL_TEST')??(prod?'lyria-3-pro-preview':'lyria-3-clip-preview');
+      const jobType=(this.config.get<string>(prod?'EF06_PRODUCTION_JOB_TYPE':'EF06_TEST_JOB_TYPE')??(prod?'PRO':'CLIP')) as AudioJobType;
+      const maxAttempts=Number(this.config.get<string>('EF06_MAX_ATTEMPTS')??'3');
+      const bucket=this.config.get<string>('EF06_AUDIO_BUCKET')??'ai-music';
+      const requestPayload={
+        model,input:pkg.providerPrompt,response_format:{type:'audio'},
+        run_mode:runMode,ef05_package_id:pkg.id,ef05_package_version:pkg.packageVersion,
+        intended_duration_sec:pkg.generationParameters['durationSec']??null,
+        test_preview:!prod,
+      };
+      const job=await this.repo.createJob({
+        projectId:pkg.projectId,projectCode:pkg.projectCode,contentUuid:req.contentUuid,
+        workflowRunId:req.workflowRunId,moduleRunId:req.moduleRunId,compositionPackageId:pkg.id,
+        jobType,provider:this.provider.provider,providerModel:model,inputPrompt:pkg.providerPrompt,
+        requestPayload,maxAttempts,storageBucket:bucket,
+      }); jobId=job.jobId;
+      const gen=await this.repo.createGeneration({
+        projectId:pkg.projectId,projectCode:pkg.projectCode,contentUuid:req.contentUuid,
+        workflowRunId:req.workflowRunId,moduleRunId:req.moduleRunId,compositionPackageId:pkg.id,
+        provider:this.provider.provider,providerModel:model,requestPayload,
+      }); generationId=gen.id;
+
+      await this.repo.updateJobStatus(jobId,'PROCESSING');
+      await this.repo.updateGenerationStatus(generationId,'SENT','GENERATING');
+
+      const produced=await this.provider.generate({model,prompt:pkg.providerPrompt,outputFormat:pkg.outputAudioFormat});
+      await this.repo.updateJobStatus(jobId,'GENERATED');
+      await this.repo.updateGenerationStatus(generationId,'ACCEPTED','GENERATED',{
+        provider_generation_id:produced.providerGenerationId??null,
+        provider_response:produced.rawMetadata,
+        generation_time_seconds:produced.generationTimeSeconds,
+        generated_at:new Date().toISOString(),
+      });
+
+      await this.repo.updateJobStatus(jobId,'UPLOADING');
+      await this.repo.updateGenerationStatus(generationId,'ACCEPTED','UPLOADING');
+      const stored=await this.storage.store({
+        projectCode:pkg.projectCode,contentUuid:req.contentUuid,moduleRunId:req.moduleRunId,
+        audio:produced.audio,mimeType:produced.mimeType,extension:produced.extension,
+      });
+
+      await this.repo.completeJob(jobId,stored,produced.providerGenerationId);
+      await this.repo.completeGeneration(generationId,produced,stored);
+
+      await this.moduleRun.finishModule(req.moduleRunId,true,{
+        module_code:'EF-06',content_uuid:req.contentUuid,workflow_run_id:req.workflowRunId,
+        module_run_id:req.moduleRunId,audio_status:'COMPLETED',job_id:jobId,generation_id:generationId,
+        provider:produced.provider,provider_model:produced.model,storage_bucket:stored.bucket,
+        storage_path:stored.path,audio_public_url:stored.publicUrl??null,
+        file_size_bytes:stored.fileSizeBytes,generation_time_seconds:produced.generationTimeSeconds,
+        run_mode:runMode,
+      },null,null);
+
+      await this.events.publish(new AudioGeneratedEvent(req.workflowRunId,req.moduleRunId,req.contentUuid,{
+        status:'COMPLETED',provider:produced.provider,providerModel:produced.model,
+        generationId,jobId,storageBucket:stored.bucket,storagePath:stored.path,
+        audioPublicUrl:stored.publicUrl,fileSizeBytes:stored.fileSizeBytes,
+      }));
+
+      return {
+        generationId,jobId,contentUuid:req.contentUuid,workflowRunId:req.workflowRunId,
+        moduleRunId:req.moduleRunId,provider:produced.provider,providerModel:produced.model,
+        storage:stored,generationTimeSeconds:produced.generationTimeSeconds,
+      };
+    }catch(error){
+      const message=error instanceof Error?error.message:String(error);
+      if(jobId){try{await this.repo.failJob(jobId,'EF06_AUDIO_GENERATION_FAILED',message.slice(0,2000));}catch{}}
+      if(generationId){try{await this.repo.failGeneration(generationId,'EF06_AUDIO_GENERATION_FAILED',message.slice(0,2000));}catch{}}
+      try{await this.moduleRun.finishModule(req.moduleRunId,false,{
+        module_code:'EF-06',content_uuid:req.contentUuid,workflow_run_id:req.workflowRunId,
+        module_run_id:req.moduleRunId,audio_status:'FAILED',job_id:jobId??null,generation_id:generationId??null,
+      },'EF06_AUDIO_GENERATION_FAILED',message.slice(0,2000));}catch{}
+      throw error;
+    }
+  }
+}
+
+----- D:\myProject\chatGpt\EEF\nest-app\src\modules\ef06-audio-generation\domain\entities\audio-generation.entity.ts -----
+export type AudioJobType = 'CLIP' | 'PRO';
+export type AudioJobStatus =
+  | 'QUEUED' | 'PROCESSING' | 'GENERATED' | 'UPLOADING'
+  | 'COMPLETED' | 'RETRY' | 'FAILED' | 'CANCELLED';
+export type AudioRequestStatus =
+  | 'PENDING' | 'SENT' | 'ACCEPTED' | 'REJECTED' | 'FAILED';
+export type AudioGenerationStatus =
+  | 'PENDING' | 'GENERATING' | 'GENERATED' | 'UPLOADING'
+  | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+
+export interface AudioProviderResult {
+  provider: string;
+  model: string;
+  providerGenerationId?: string;
+  audio: Buffer;
+  mimeType: string;
+  extension: string;
+  outputText?: string;
+  rawMetadata: Record<string, unknown>;
+  generationTimeSeconds: number;
+}
+export interface StoredAudioObject {
+  bucket: string;
+  path: string;
+  publicUrl?: string;
+  fileSizeBytes: number;
+  mimeType: string;
+  extension: string;
+}
+export interface AudioGenerationResult {
+  generationId: string;
+  jobId: string;
+  contentUuid: string;
+  workflowRunId: string;
+  moduleRunId: string;
+  provider: string;
+  providerModel: string;
+  storage: StoredAudioObject;
+  generationTimeSeconds: number;
+}
+
+----- D:\myProject\chatGpt\EEF\nest-app\src\modules\ef06-audio-generation\domain\repositories\audio-generation.repository.ts -----
+import {
+  AudioGenerationStatus, AudioJobStatus, AudioJobType,
+  AudioProviderResult, AudioRequestStatus, StoredAudioObject,
+} from '../entities/audio-generation.entity';
+
+export interface Ef06ProviderPackage {
+  id: string;
+  projectId: string;
+  projectCode: string;
+  contentUuid: string;
+  packageVersion: string;
+  providerPrompt: string;
+  outputAudioFormat: string;
+  generationParameters: Record<string, unknown>;
+  packageStatus: 'READY';
+}
+export interface CreateAudioJobInput {
+  projectId: string; projectCode: string; contentUuid: string;
+  workflowRunId: string; moduleRunId: string; compositionPackageId: string;
+  jobType: AudioJobType; provider: string; providerModel: string;
+  inputPrompt: string; requestPayload: Record<string, unknown>;
+  maxAttempts: number; storageBucket: string;
+}
+export interface CreateGenerationInput {
+  projectId: string; projectCode: string; contentUuid: string;
+  workflowRunId: string; moduleRunId: string; compositionPackageId: string;
+  provider: string; providerModel: string; requestPayload: Record<string, unknown>;
+}
+export abstract class AudioGenerationRepository {
+  abstract getProviderPackage(contentUuid: string): Promise<Ef06ProviderPackage>;
+  abstract createJob(input: CreateAudioJobInput): Promise<{ jobId: string }>;
+  abstract createGeneration(input: CreateGenerationInput): Promise<{ id: string }>;
+  abstract updateJobStatus(jobId: string, status: AudioJobStatus, patch?: Record<string, unknown>): Promise<void>;
+  abstract updateGenerationStatus(id: string, request: AudioRequestStatus, status: AudioGenerationStatus, patch?: Record<string, unknown>): Promise<void>;
+  abstract completeJob(jobId: string, storage: StoredAudioObject, providerInteractionId?: string): Promise<void>;
+  abstract completeGeneration(id: string, result: AudioProviderResult, storage: StoredAudioObject): Promise<void>;
+  abstract failJob(jobId: string, code: string, message: string): Promise<void>;
+  abstract failGeneration(id: string, code: string, message: string): Promise<void>;
+}
+
+----- D:\myProject\chatGpt\EEF\nest-app\src\modules\ef06-audio-generation\domain\services\audio-provider.service.ts -----
+import { AudioProviderResult } from '../entities/audio-generation.entity';
+export interface GenerateAudioProviderInput {
+  model: string;
+  prompt: string;
+  outputFormat: string;
+}
+export abstract class AudioProvider {
+  abstract readonly provider: string;
+  abstract generate(input: GenerateAudioProviderInput): Promise<AudioProviderResult>;
+}
+
+----- D:\myProject\chatGpt\EEF\nest-app\src\modules\ef06-audio-generation\domain\services\audio-storage.service.ts -----
+import { StoredAudioObject } from '../entities/audio-generation.entity';
+export interface StoreAudioInput {
+  projectCode: string;
+  contentUuid: string;
+  moduleRunId: string;
+  audio: Buffer;
+  mimeType: string;
+  extension: string;
+}
+export abstract class AudioStorage {
+  abstract store(input: StoreAudioInput): Promise<StoredAudioObject>;
+}
+
+----- D:\myProject\chatGpt\EEF\nest-app\src\modules\ef06-audio-generation\infrastructure\supabase-audio-generation.repository.ts -----
+import { Injectable } from '@nestjs/common';
+import { SupabaseService } from '../../../common/supabase/supabase.service';
+import {
+  AudioGenerationRepository,
+  CreateAudioJobInput,
+  CreateGenerationInput,
+  Ef06ProviderPackage,
+} from '../domain/repositories/audio-generation.repository';
+import {
+  AudioGenerationStatus,
+  AudioJobStatus,
+  AudioProviderResult,
+  AudioRequestStatus,
+  StoredAudioObject,
+} from '../domain/entities/audio-generation.entity';
+
+@Injectable()
+export class SupabaseAudioGenerationRepository extends AudioGenerationRepository {
+  constructor(private readonly supabase: SupabaseService) {
+    super();
+  }
+
+  async getProviderPackage(contentUuid: string): Promise<Ef06ProviderPackage> {
+    const { data, error } = await this.supabase.db
+      .from('project_composition_packages')
+      .select('*')
+      .eq('content_uuid', contentUuid)
+      .eq('package_status', 'READY')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data)
+      throw new Error(
+        `EF-05 READY package not found: ${contentUuid}${error ? ` ${error.message}` : ''}`,
+      );
+    return {
+      id: String(data.id),
+      projectId: String(data.project_id),
+      projectCode: String(data.project_code),
+      contentUuid: String(data.content_uuid),
+      packageVersion: String(data.package_version ?? 'v1.0'),
+      providerPrompt: String(data.provider_prompt ?? ''),
+      outputAudioFormat: String(data.output_audio_format ?? 'mp3'),
+      generationParameters: this.obj(data.generation_parameters),
+      packageStatus: 'READY',
+    };
+  }
+
+  async createJob(i: CreateAudioJobInput): Promise<{ jobId: string }> {
+    const { data, error } = await this.supabase.db
+      .from('project_audio_jobs')
+      .insert({
+        project_id: i.projectId,
+        geef_project_id: i.projectId,
+        project_code: i.projectCode,
+        content_uuid: i.contentUuid,
+        workflow_run_id: i.workflowRunId,
+        module_run_id: i.moduleRunId,
+        composition_package_id: i.compositionPackageId,
+        job_type: i.jobType,
+        provider: i.provider,
+        provider_model: i.providerModel,
+        input_prompt: i.inputPrompt,
+        response_format: 'audio',
+        job_status: 'QUEUED',
+        attempt_count: 0,
+        max_attempts: i.maxAttempts,
+        storage_bucket: i.storageBucket,
+        request_payload: i.requestPayload,
+      })
+      .select('job_id')
+      .single();
+    if (error || !data)
+      throw new Error(
+        `Failed to create audio job: ${error?.message ?? 'no data'}`,
+      );
+    return { jobId: String(data.job_id) };
+  }
+
+  async createGeneration(i: CreateGenerationInput): Promise<{ id: string }> {
+    const { data, error } = await this.supabase.db
+      .from('project_audio_generations')
+      .insert({
+        workflow_version: 'EF-1.0',
+        module: 'EF-06',
+        module_version: 'EF-06-V1',
+        project_id: i.projectId,
+        geef_project_id: i.projectId,
+        project_code: i.projectCode,
+        content_uuid: i.contentUuid,
+        workflow_run_id: i.workflowRunId,
+        module_run_id: i.moduleRunId,
+        composition_package_id: i.compositionPackageId,
+        provider: i.provider,
+        provider_model: i.providerModel,
+        request_status: 'PENDING',
+        generation_status: 'PENDING',
+        request_payload: i.requestPayload,
+        provider_response: {},
+        retry_count: 0,
+      })
+      .select('id')
+      .single();
+    if (error || !data)
+      throw new Error(
+        `Failed to create audio generation: ${error?.message ?? 'no data'}`,
+      );
+    return { id: String(data.id) };
+  }
+
+  async updateJobStatus(
+    id: string,
+    status: AudioJobStatus,
+    patch: Record<string, unknown> = {},
+  ): Promise<void> {
+    const p: Record<string, unknown> = {
+      job_status: status,
+      updated_at: new Date().toISOString(),
+      ...patch,
+    };
+    if (status === 'PROCESSING') {
+      p.started_at = new Date().toISOString();
+      p.attempt_count = 1;
+    }
+    const { error } = await this.supabase.db
+      .from('project_audio_jobs')
+      .update(p)
+      .eq('job_id', id);
+    if (error) throw new Error(`Failed to update audio job: ${error.message}`);
+  }
+
+  async updateGenerationStatus(
+    id: string,
+    request: AudioRequestStatus,
+    status: AudioGenerationStatus,
+    patch: Record<string, unknown> = {},
+  ): Promise<void> {
+    const { error } = await this.supabase.db
+      .from('project_audio_generations')
+      .update({
+        request_status: request,
+        generation_status: status,
+        updated_at: new Date().toISOString(),
+        ...patch,
+      })
+      .eq('id', id);
+    if (error)
+      throw new Error(`Failed to update audio generation: ${error.message}`);
+  }
+
+  async completeJob(
+    id: string,
+    s: StoredAudioObject,
+    providerId?: string,
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    const { error } = await this.supabase.db
+      .from('project_audio_jobs')
+      .update({
+        job_status: 'COMPLETED',
+        storage_bucket: s.bucket,
+        storage_path: s.path,
+        audio_mime_type: s.mimeType,
+        audio_public_url: s.publicUrl ?? null,
+        provider_interaction_id: providerId ?? null,
+        completed_at: now,
+        updated_at: now,
+      })
+      .eq('job_id', id);
+    if (error)
+      throw new Error(`Failed to complete audio job: ${error.message}`);
+  }
+
+  async completeGeneration(
+    id: string,
+    r: AudioProviderResult,
+    s: StoredAudioObject,
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    const { error } = await this.supabase.db
+      .from('project_audio_generations')
+      .update({
+        provider_generation_id: r.providerGenerationId ?? null,
+        request_status: 'ACCEPTED',
+        generation_status: 'COMPLETED',
+        provider_response: r.rawMetadata,
+        audio_format: s.extension,
+        audio_mime_type: s.mimeType,
+        audio_storage_bucket: s.bucket,
+        audio_storage_path: s.path,
+        audio_public_url: s.publicUrl ?? null,
+        file_size_bytes: s.fileSizeBytes,
+        generation_time_seconds: r.generationTimeSeconds,
+        generated_at: now,
+        uploaded_at: now,
+        updated_at: now,
+      })
+      .eq('id', id);
+    if (error)
+      throw new Error(`Failed to complete audio generation: ${error.message}`);
+  }
+
+  async failJob(id: string, code: string, message: string): Promise<void> {
+    await this.updateJobStatus(id, 'FAILED', {
+      error_code: code,
+      error_message: message,
+      failed_at: new Date().toISOString(),
+    });
+  }
+  async failGeneration(
+    id: string,
+    code: string,
+    message: string,
+  ): Promise<void> {
+    await this.updateGenerationStatus(id, 'FAILED', 'FAILED', {
+      error_code: code,
+      error_message: message,
+    });
+  }
+  private obj(v: unknown): Record<string, unknown> {
+    return v && typeof v === 'object' && !Array.isArray(v)
+      ? (v as Record<string, unknown>)
+      : {};
+  }
+}
+
+----- D:\myProject\chatGpt\EEF\nest-app\src\modules\ef06-audio-generation\infrastructure\google\google-lyria-audio.provider.ts -----
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { GoogleGenAI } from '@google/genai';
+import { AudioProvider } from '../../domain/services/audio-provider.service';
+import { AudioProviderResult } from '../../domain/entities/audio-generation.entity';
+
+@Injectable()
+export class GoogleLyriaAudioProvider extends AudioProvider {
+  readonly provider = 'GOOGLE_LYRIA';
+  constructor(private readonly config: ConfigService) { super(); }
+
+  async generate(input: {model: string; prompt: string; outputFormat: string;}): Promise<AudioProviderResult> {
+    const apiKey = this.config.get<string>('GEMINI_API_KEY') ?? this.config.get<string>('GOOGLE_API_KEY');
+    if (!apiKey) throw new Error('GEMINI_API_KEY or GOOGLE_API_KEY is required');
+
+    const ai = new GoogleGenAI({ apiKey });
+    const timeoutMs = Number(this.config.get<string>('EF06_GENERATION_TIMEOUT_SECONDS') ?? '300') * 1000;
+    const started = Date.now();
+
+    const interaction = await this.withTimeout(
+      ai.interactions.create({
+        model: input.model,
+        input: input.prompt,
+        response_format: { type: 'audio' },
+      }),
+      timeoutMs,
+    );
+
+    const generatedAudio = interaction.output_audio;
+    if (!generatedAudio?.data) throw new Error('Lyria response did not contain output_audio.data');
+
+    const audio = Buffer.from(generatedAudio.data, 'base64');
+    if (!audio.length) throw new Error('Lyria returned empty audio');
+
+    const format = input.outputFormat.toLowerCase() === 'wav' ? 'wav' : 'mp3';
+    const record = interaction as unknown as Record<string, unknown>;
+    const id = typeof record.id === 'string' ? record.id : undefined;
+
+    return {
+      provider: this.provider,
+      model: input.model,
+      providerGenerationId: id,
+      audio,
+      mimeType: format === 'wav' ? 'audio/wav' : 'audio/mpeg',
+      extension: format,
+      outputText: typeof interaction.output_text === 'string' ? interaction.output_text : undefined,
+      rawMetadata: {
+        interaction_id: id ?? null,
+        audio_bytes: audio.length,
+        output_text: typeof interaction.output_text === 'string' ? interaction.output_text : null,
+      },
+      generationTimeSeconds: Number(((Date.now() - started) / 1000).toFixed(3)),
+    };
+  }
+
+  private async withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise<T>((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`Lyria timeout after ${ms}ms`)), ms);
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+}
+
+----- D:\myProject\chatGpt\EEF\nest-app\src\modules\ef06-audio-generation\infrastructure\storage\supabase-audio-storage.service.ts -----
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { SupabaseService } from '../../../../common/supabase/supabase.service';
+import { AudioStorage, StoreAudioInput } from '../../domain/services/audio-storage.service';
+import { StoredAudioObject } from '../../domain/entities/audio-generation.entity';
+
+@Injectable()
+export class SupabaseAudioStorageService extends AudioStorage {
+  constructor(private readonly supabase: SupabaseService, private readonly config: ConfigService) { super(); }
+
+  async store(input: StoreAudioInput): Promise<StoredAudioObject> {
+    const bucket = this.config.get<string>('EF06_AUDIO_BUCKET') ?? 'ai-music';
+    const prefix = this.config.get<string>('EF06_STORAGE_PREFIX') ?? 'geef';
+    const project = input.projectCode.replace(/[^a-zA-Z0-9_-]+/g, '_');
+    const path = `${prefix}/${project}/${input.contentUuid}/ef06/${input.moduleRunId}.${input.extension}`;
+
+    const { error } = await this.supabase.db.storage.from(bucket).upload(path, input.audio, {
+      contentType: input.mimeType,
+      upsert: true,
+    });
+    if (error) throw new Error(`Supabase audio upload failed: ${error.message}`);
+
+    const { data } = this.supabase.db.storage.from(bucket).getPublicUrl(path);
+    return {
+      bucket, path,
+      publicUrl: data?.publicUrl || undefined,
+      fileSizeBytes: input.audio.length,
+      mimeType: input.mimeType,
+      extension: input.extension,
+    };
+  }
+}
+
+----- D:\myProject\chatGpt\EEF\nest-app\src\modules\ef06-audio-generation\module\ef06-audio-generation.module.ts -----
+import { Module } from '@nestjs/common';
+import { WorkflowModule } from '../../../common/workflow/workflow.module';
+import { AudioGenerationRepository } from '../domain/repositories/audio-generation.repository';
+import { AudioProvider } from '../domain/services/audio-provider.service';
+import { AudioStorage } from '../domain/services/audio-storage.service';
+import { SupabaseAudioGenerationRepository } from '../infrastructure/supabase-audio-generation.repository';
+import { GoogleLyriaAudioProvider } from '../infrastructure/google/google-lyria-audio.provider';
+import { SupabaseAudioStorageService } from '../infrastructure/storage/supabase-audio-storage.service';
+import { GenerateAudioUseCase } from '../application/use-cases/generate-audio.use-case';
+
+@Module({
+  imports:[WorkflowModule],
+  providers:[
+    GenerateAudioUseCase,
+    {provide:AudioGenerationRepository,useClass:SupabaseAudioGenerationRepository},
+    {provide:AudioProvider,useClass:GoogleLyriaAudioProvider},
+    {provide:AudioStorage,useClass:SupabaseAudioStorageService},
+  ],
+  exports:[GenerateAudioUseCase],
+})
+export class Ef06AudioGenerationModule {}
+
+===== COMMON SOURCE FILES =====
+D:\myProject\chatGpt\EEF\nest-app\src\common\ai\ai.module.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\ai\google-ai.service.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\ai\model-registry.service.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\events\audio-generated-event.listener.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\events\composition-plan-event.listener.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\events\context-event.listener.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\events\event-bus.service.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\events\events.module.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\events\lyrics-event.listener.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\events\music-spec-event.listener.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\events\provider-package-event.listener.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\events\contracts\domain-event.interface.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\events\events\audio-generated.event.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\events\events\composition-plan-generated.event.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\events\events\context-generated.event.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\events\events\lyrics-generated.event.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\events\events\music-spec-generated.event.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\events\events\provider-package-generated.event.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\supabase\supabase.module.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\supabase\supabase.service.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\worker\executor.registry.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\worker\module-executor.interface.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\worker\worker.controller.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\worker\worker.module.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\worker\worker.service.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\worker\dto\run-next-module.dto.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\workflow\workflow.module.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\workflow\workflow.service.ts
+D:\myProject\chatGpt\EEF\nest-app\src\common\workflow\module-run\module-run.service.ts

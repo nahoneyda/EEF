@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "GEEF Worker: Flask",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "flask",
+      "envFile": "${workspaceFolder}/.env",
+      "env": {"FLASK_APP": "app.py", "FLASK_DEBUG": "1", "PORT": "8080"},
+      "args": ["run", "--host=0.0.0.0", "--port=8080"],
+      "jinja": true
+    }
+  ]
+}

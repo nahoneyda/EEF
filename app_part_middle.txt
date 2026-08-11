@@ -1,0 +1,59 @@
+﻿            error_message=None,
+        )
+
+        logger.info(
+            "EF-01 module succeeded: "
+            "module_run_id=%s content_id=%s",
+            module_run_id,
+            content_id,
+        )
+
+        return {
+            "dry_run": False,
+            "module_code": "EF-01",
+            "context_status": "READY",
+            "saved_context": saved_context,
+            "module_started": started_module,
+            "module_finished": finished_module,
+        }
+
+    except Exception as exc:
+        logger.exception(
+            "EF-01 execution failed: "
+            "module_run_id=%s content_id=%s",
+            module_run_id,
+            content_id,
+        )
+
+        # begin_module 성공 이후의 오류만 FAILED로 전환합니다.
+        if module_started:
+            try:
+                finish_module(
+                    module_run_id=module_run_id,
+                    success=False,
+                    output_payload={
+                        "module_code": "EF-01",
+                        "content_id": content_id,
+                        "content_uuid": job.get(
+                            "content_uuid"
+                        ),
+                        "workflow_run_id": job.get(
+                            "workflow_run_id"
+                        ),
+                        "module_run_id": module_run_id,
+                        "context_status": "FAILED",
+                    },
+                    error_code="EF01_EXECUTION_FAILED",
+                    error_message=str(exc)[:2000],
+                )
+
+                logger.info(
+                    "EF-01 module marked as FAILED: "
+                    "module_run_id=%s",
+                    module_run_id,
+                )
+
+            except Exception:
+                logger.exception(
+                    "Failed to mark EF-01 as FAILED: "
+                    "module_run_id=%s",

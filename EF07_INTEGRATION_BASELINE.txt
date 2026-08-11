@@ -1,0 +1,462 @@
+﻿===== EF07 INTEGRATION BASELINE =====
+
+===== FILE: .\src\common\worker\executor.registry.ts =====
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import { ModuleExecutor } from './module-executor.interface';
+export const EF01_EXECUTOR=Symbol('EF01_EXECUTOR');
+export const EF02_EXECUTOR=Symbol('EF02_EXECUTOR');
+export const EF03_EXECUTOR=Symbol('EF03_EXECUTOR');
+export const EF04_EXECUTOR=Symbol('EF04_EXECUTOR');
+export const EF05_EXECUTOR=Symbol('EF05_EXECUTOR');
+export const EF06_EXECUTOR=Symbol('EF06_EXECUTOR');
+@Injectable()
+export class ExecutorRegistry implements OnModuleInit{
+  private readonly executors=new Map<string,ModuleExecutor>();
+  constructor(
+    @Inject(EF01_EXECUTOR) private readonly e1:ModuleExecutor,
+    @Inject(EF02_EXECUTOR) private readonly e2:ModuleExecutor,
+    @Inject(EF03_EXECUTOR) private readonly e3:ModuleExecutor,
+    @Inject(EF04_EXECUTOR) private readonly e4:ModuleExecutor,
+    @Inject(EF05_EXECUTOR) private readonly e5:ModuleExecutor,
+    @Inject(EF06_EXECUTOR) private readonly e6:ModuleExecutor,
+  ){}
+  onModuleInit():void{[this.e1,this.e2,this.e3,this.e4,this.e5,this.e6].forEach(e=>this.register(e));}
+  register(e:ModuleExecutor):void{if(this.executors.has(e.moduleCode))throw new Error(`Duplicate executor registration: ${e.moduleCode}`);this.executors.set(e.moduleCode,e);}
+  get(code:string):ModuleExecutor{const e=this.executors.get(code);if(!e)throw new Error(`Executor not found: ${code}`);return e;}
+  has(code:string):boolean{return this.executors.has(code);}
+}
+
+===== FILE: .\src\common\worker\module-executor.interface.ts =====
+export interface ModuleExecutionJob {
+  moduleCode: string;
+
+  contentUuid: string;
+
+  workflowRunId: string;
+
+  moduleRunId: string;
+
+  inputPayload?: Record<string, unknown>;
+}
+
+export interface ModuleExecutionResult {
+  moduleCode: string;
+
+  status: 'SUCCEEDED' | 'FAILED';
+
+  output?: Record<string, unknown>;
+}
+
+export abstract class ModuleExecutor {
+  abstract readonly moduleCode: string;
+
+  abstract execute(job: ModuleExecutionJob): Promise<ModuleExecutionResult>;
+}
+
+===== FILE: .\src\common\worker\worker.module.ts =====
+import { Module } from '@nestjs/common';
+import { WorkflowModule } from '../workflow/workflow.module';
+import { Ef01ContextModule } from '../../modules/ef01-context/module/ef01-context.module';
+import { Ef01ContextExecutor } from '../../modules/ef01-context/application/executors/ef01-context.executor';
+import { Ef02LyricsModule } from '../../modules/ef02-lyrics/module/ef02-lyrics.module';
+import { Ef02LyricsExecutor } from '../../modules/ef02-lyrics/application/executors/ef02-lyrics.executor';
+import { Ef03MusicSpecModule } from '../../modules/ef03-music-spec/module/ef03-music-spec.module';
+import { Ef03MusicSpecExecutor } from '../../modules/ef03-music-spec/application/executors/ef03-music-spec.executor';
+import { Ef04CompositionPlanModule } from '../../modules/ef04-composition-plan/module/ef04-composition-plan.module';
+import { Ef04CompositionPlanExecutor } from '../../modules/ef04-composition-plan/application/executors/ef04-composition-plan.executor';
+import { Ef05ProviderPackageModule } from '../../modules/ef05-provider-package/module/ef05-provider-package.module';
+import { Ef05ProviderPackageExecutor } from '../../modules/ef05-provider-package/application/executors/ef05-provider-package.executor';
+import { Ef06AudioGenerationModule } from '../../modules/ef06-audio-generation/module/ef06-audio-generation.module';
+import { Ef06AudioGenerationExecutor } from '../../modules/ef06-audio-generation/application/executors/ef06-audio-generation.executor';
+import { EF01_EXECUTOR,EF02_EXECUTOR,EF03_EXECUTOR,EF04_EXECUTOR,EF05_EXECUTOR,EF06_EXECUTOR,ExecutorRegistry } from './executor.registry';
+import { WorkerService } from './worker.service';
+import { WorkerController } from './worker.controller';
+@Module({
+  imports:[WorkflowModule,Ef01ContextModule,Ef02LyricsModule,Ef03MusicSpecModule,Ef04CompositionPlanModule,Ef05ProviderPackageModule,Ef06AudioGenerationModule],
+  controllers:[WorkerController],
+  providers:[
+    Ef01ContextExecutor,Ef02LyricsExecutor,Ef03MusicSpecExecutor,Ef04CompositionPlanExecutor,Ef05ProviderPackageExecutor,Ef06AudioGenerationExecutor,
+    {provide:EF01_EXECUTOR,useExisting:Ef01ContextExecutor},
+    {provide:EF02_EXECUTOR,useExisting:Ef02LyricsExecutor},
+    {provide:EF03_EXECUTOR,useExisting:Ef03MusicSpecExecutor},
+    {provide:EF04_EXECUTOR,useExisting:Ef04CompositionPlanExecutor},
+    {provide:EF05_EXECUTOR,useExisting:Ef05ProviderPackageExecutor},
+    {provide:EF06_EXECUTOR,useExisting:Ef06AudioGenerationExecutor},
+    ExecutorRegistry,WorkerService,
+  ],
+  exports:[WorkerService,ExecutorRegistry],
+})
+export class WorkerModule{}
+
+===== FILE: .\src\common\events\event-bus.service.ts =====
+import { Injectable, Logger } from '@nestjs/common';
+
+import { EventEmitter2 } from '@nestjs/event-emitter';
+
+import { DomainEvent } from './contracts/domain-event.interface';
+
+@Injectable()
+export class EventBusService {
+  private readonly logger = new Logger(EventBusService.name);
+
+  constructor(private readonly eventEmitter: EventEmitter2) {}
+
+  async publish<TPayload>(event: DomainEvent<TPayload>): Promise<void> {
+    this.logger.log(
+      [
+        'Publishing event',
+        `name=${event.eventName}`,
+        `eventId=${event.eventId}`,
+        `moduleRunId=${event.moduleRunId}`,
+      ].join(' '),
+    );
+
+    await this.eventEmitter.emitAsync(event.eventName, event);
+  }
+}
+
+===== FILE: .\src\common\events\events.module.ts =====
+import { Global, Module } from '@nestjs/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { EventBusService } from './event-bus.service';
+import { ContextEventListener } from './context-event.listener';
+import { LyricsEventListener } from './lyrics-event.listener';
+import { MusicSpecEventListener } from './music-spec-event.listener';
+import { CompositionPlanEventListener } from './composition-plan-event.listener';
+import { ProviderPackageEventListener } from './provider-package-event.listener';
+import { AudioGeneratedEventListener } from './audio-generated-event.listener';
+@Global()
+@Module({
+  imports:[EventEmitterModule.forRoot({wildcard:false,delimiter:'.',newListener:false,removeListener:false,maxListeners:20,verboseMemoryLeak:true,ignoreErrors:false})],
+  providers:[EventBusService,ContextEventListener,LyricsEventListener,MusicSpecEventListener,CompositionPlanEventListener,ProviderPackageEventListener,AudioGeneratedEventListener],
+  exports:[EventBusService],
+})
+export class EventsModule{}
+
+===== FILE: .\src\common\events\audio-generated-event.listener.ts =====
+import { Injectable, Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
+import { AudioGeneratedEvent } from './events/audio-generated.event';
+@Injectable()
+export class AudioGeneratedEventListener{
+  private readonly logger=new Logger(AudioGeneratedEventListener.name);
+  @OnEvent('EF06.AudioGenerated')
+  handle(e:AudioGeneratedEvent):void{
+    this.logger.log(`AudioGenerated received eventId=${e.eventId} contentUuid=${e.contentUuid} moduleRunId=${e.moduleRunId} generationId=${e.payload.generationId} storagePath=${e.payload.storagePath}`);
+  }
+}
+
+===== FILE: .\src\common\events\events\audio-generated.event.ts =====
+import { randomUUID } from 'crypto';
+import { DomainEvent } from '../contracts/domain-event.interface';
+export interface AudioGeneratedPayload {
+  status:'COMPLETED'; provider:string; providerModel:string; generationId:string; jobId:string;
+  storageBucket:string; storagePath:string; audioPublicUrl?:string; fileSizeBytes:number;
+}
+export class AudioGeneratedEvent implements DomainEvent<AudioGeneratedPayload>{
+  readonly eventId=randomUUID(); readonly eventName='EF06.AudioGenerated';
+  readonly occurredAt=new Date(); readonly sourceModule='EF-06';
+  constructor(readonly workflowRunId:string,readonly moduleRunId:string,readonly contentUuid:string,readonly payload:AudioGeneratedPayload){}
+}
+
+===== FILE: .\src\common\workflow\workflow.module.ts =====
+import { Module } from '@nestjs/common';
+
+import { WorkflowService } from './workflow.service';
+
+import { ModuleRunService } from './module-run/module-run.service';
+
+@Module({
+  providers: [WorkflowService, ModuleRunService],
+
+  exports: [WorkflowService, ModuleRunService],
+})
+export class WorkflowModule {}
+
+===== FILE: .\src\common\workflow\module-run\module-run.service.ts =====
+import { Injectable, Logger } from '@nestjs/common';
+
+import { ConfigService } from '@nestjs/config';
+
+import { SupabaseService } from '../../supabase/supabase.service';
+
+@Injectable()
+export class ModuleRunService {
+  private readonly logger = new Logger(ModuleRunService.name);
+
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  private firstRow<T>(value: T | T[] | null): T | null {
+    if (Array.isArray(value)) {
+      return value.length > 0 ? value[0] : null;
+    }
+
+    return value;
+  }
+
+  async beginModule(moduleRunId: string): Promise<unknown> {
+    const executionId =
+      this.configService.get<string>('WORKER_ID') ?? 'geef-nest-worker';
+
+    const rpcName =
+      this.configService.get<string>('RPC_BEGIN_MODULE') ?? 'geef_begin_module';
+
+    this.logger.log(`Beginning module: ${moduleRunId}`);
+
+    const result = await this.supabaseService.rpc(rpcName, {
+      p_module_run_id: moduleRunId,
+
+      p_make_execution_id: executionId,
+    });
+
+    return this.firstRow(result);
+  }
+
+  async finishModule(
+    moduleRunId: string,
+    success: boolean,
+    outputPayload: Record<string, unknown>,
+    errorCode: string | null = null,
+    errorMessage: string | null = null,
+  ): Promise<unknown> {
+    const rpcName =
+      this.configService.get<string>('RPC_FINISH_MODULE') ??
+      'geef_finish_module';
+
+    this.logger.log(`Finishing module: ${moduleRunId} success=${success}`);
+
+    const result = await this.supabaseService.rpc(rpcName, {
+      p_module_run_id: moduleRunId,
+
+      p_succeeded: success,
+
+      p_output_payload: outputPayload,
+
+      p_error_code: errorCode,
+
+      p_error_message: errorMessage,
+    });
+
+    return this.firstRow(result);
+  }
+}
+
+===== FILE: .\src\common\supabase\supabase.module.ts =====
+import { Global, Module } from '@nestjs/common';
+import { SupabaseService } from './supabase.service';
+
+@Global()
+@Module({
+  providers: [SupabaseService],
+  exports: [SupabaseService],
+})
+export class SupabaseModule {}
+
+===== FILE: .\src\common\supabase\supabase.service.ts =====
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
+
+import { ConfigService } from '@nestjs/config';
+
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
+@Injectable()
+export class SupabaseService {
+  private readonly logger = new Logger(SupabaseService.name);
+
+  private readonly client: SupabaseClient;
+
+  constructor(private readonly configService: ConfigService) {
+    const supabaseUrl = this.configService.get<string>('SUPABASE_URL');
+
+    const serviceRoleKey = this.configService.get<string>(
+      'SUPABASE_SERVICE_ROLE_KEY',
+    );
+
+    if (!supabaseUrl) {
+      throw new Error('SUPABASE_URL environment variable is required');
+    }
+
+    if (!serviceRoleKey) {
+      throw new Error(
+        'SUPABASE_SERVICE_ROLE_KEY environment variable is required',
+      );
+    }
+
+    this.client = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+
+    this.logger.log('Supabase client initialized');
+  }
+
+  get db(): SupabaseClient {
+    return this.client;
+  }
+
+  async rpc<T = unknown>(
+    functionName: string,
+    params: Record<string, unknown> = {},
+  ): Promise<T> {
+    const { data, error } = await this.client.rpc(functionName, params);
+
+    if (error) {
+      this.logger.error(`Supabase RPC failed: ${functionName}`, error.message);
+
+      throw new InternalServerErrorException(
+        `Supabase RPC failed: ${functionName}`,
+      );
+    }
+
+    return data as T;
+  }
+
+  async select<T = unknown>(tableName: string, columns = '*'): Promise<T[]> {
+    const { data, error } = await this.client.from(tableName).select(columns);
+
+    if (error) {
+      this.logger.error(`Supabase SELECT failed: ${tableName}`, error.message);
+
+      throw new InternalServerErrorException(
+        `Supabase SELECT failed: ${tableName}`,
+      );
+    }
+
+    return (data ?? []) as T[];
+  }
+
+  async insert<T = unknown>(
+    tableName: string,
+    payload: Record<string, unknown>,
+  ): Promise<T> {
+    const { data, error } = await this.client
+      .from(tableName)
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      this.logger.error(`Supabase INSERT failed: ${tableName}`, error.message);
+
+      throw new InternalServerErrorException(
+        `Supabase INSERT failed: ${tableName}`,
+      );
+    }
+
+    return data as T;
+  }
+
+  async update<T = unknown>(
+    tableName: string,
+    payload: Record<string, unknown>,
+    match: Record<string, unknown>,
+  ): Promise<T[]> {
+    let query = this.client.from(tableName).update(payload);
+
+    for (const [key, value] of Object.entries(match)) {
+      query = query.eq(key, value);
+    }
+
+    const { data, error } = await query.select();
+
+    if (error) {
+      this.logger.error(`Supabase UPDATE failed: ${tableName}`, error.message);
+
+      throw new InternalServerErrorException(
+        `Supabase UPDATE failed: ${tableName}`,
+      );
+    }
+
+    return (data ?? []) as T[];
+  }
+
+  async healthCheck(): Promise<boolean> {
+    const { error } = await this.client
+      .from('geef_workflow_runs')
+      .select('id')
+      .limit(1);
+
+    if (error) {
+      this.logger.error('Supabase health check failed', error.message);
+
+      return false;
+    }
+
+    return true;
+  }
+}
+
+===== FILE: .\src\app.module.ts =====
+import { Module } from '@nestjs/common';
+
+import { ConfigModule } from '@nestjs/config';
+
+import { AppController } from './app.controller';
+
+import { AppService } from './app.service';
+
+import { SupabaseModule } from './common/supabase/supabase.module';
+
+import { WorkflowModule } from './common/workflow/workflow.module';
+
+import { Ef01ContextModule } from './modules/ef01-context/module/ef01-context.module';
+import { WorkerModule } from './common/worker/worker.module';
+import { EventsModule } from './common/events/events.module';
+import { AiModule } from './common/ai/ai.module';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+
+      envFilePath: '.env',
+    }),
+
+    SupabaseModule,
+
+    WorkflowModule,
+
+    Ef01ContextModule,
+    WorkerModule,
+    EventsModule,
+    AiModule,
+  ],
+
+  controllers: [AppController],
+
+  providers: [AppService],
+})
+export class AppModule {}
+
+===== NOT FOUND: .\Dockerfile =====
+
+===== FILE: ..\Dockerfile =====
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PORT=8080
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+
+CMD exec gunicorn --bind :${PORT} --workers 1 --threads 8 --timeout 0 app:app
+
+===== FILE: ..\.dockerignore =====
+.git
+.venv
+__pycache__
+*.pyc
+.env
+.vscode
