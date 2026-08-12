@@ -32,6 +32,9 @@ import { Ef09StoryboardModule } from '../../modules/ef09-storyboard/module/ef09-
 import { Ef10ImageGenerationExecutor } from '../../modules/ef10-image-generation/application/executors/ef10-image-generation.executor';
 import { Ef10ImageGenerationModule } from '../../modules/ef10-image-generation/module/ef10-image-generation.module';
 
+import { Ef11VideoGenerationExecutor } from '../../modules/ef11-video-generation/application/executors/ef11-video-generation.executor';
+import { Ef11VideoGenerationModule } from '../../modules/ef11-video-generation/module/ef11-video-generation.module';
+
 import {
   EF01_EXECUTOR,
   EF02_EXECUTOR,
@@ -43,6 +46,7 @@ import {
   EF08_EXECUTOR,
   EF09_EXECUTOR,
   EF10_EXECUTOR,
+  EF11_EXECUTOR,
   ExecutorRegistry,
 } from './executor.registry';
 
@@ -62,6 +66,7 @@ import { WorkerService } from './worker.service';
     Ef08VideoConceptModule,
     Ef09StoryboardModule,
     Ef10ImageGenerationModule,
+    Ef11VideoGenerationModule,
   ],
   controllers: [WorkerController],
   providers: [
@@ -75,6 +80,7 @@ import { WorkerService } from './worker.service';
     Ef08VideoConceptExecutor,
     Ef09StoryboardExecutor,
     Ef10ImageGenerationExecutor,
+    Ef11VideoGenerationExecutor,
 
     {
       provide: EF01_EXECUTOR,
@@ -115,6 +121,10 @@ import { WorkerService } from './worker.service';
     {
       provide: EF10_EXECUTOR,
       useExisting: Ef10ImageGenerationExecutor,
+    },
+    {
+      provide: EF11_EXECUTOR,
+      useExisting: Ef11VideoGenerationExecutor,
     },
 
     ExecutorRegistry,

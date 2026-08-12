@@ -7,7 +7,7 @@
     "source.fixAll.eslint": "explicit"
   },
 
-  "editor.fontSize": 13,
-  "terminal.integrated.fontSize": 13,
+  "editor.fontSize": 11,
+  "terminal.integrated.fontSize": 11,
   "window.zoomLevel": 1
 }

@@ -12,6 +12,7 @@ export const EF07_EXECUTOR = Symbol('EF07_EXECUTOR');
 export const EF08_EXECUTOR = Symbol('EF08_EXECUTOR');
 export const EF09_EXECUTOR = Symbol('EF09_EXECUTOR');
 export const EF10_EXECUTOR = Symbol('EF10_EXECUTOR');
+export const EF11_EXECUTOR = Symbol('EF11_EXECUTOR');
 
 @Injectable()
 export class ExecutorRegistry implements OnModuleInit {
@@ -47,6 +48,9 @@ export class ExecutorRegistry implements OnModuleInit {
 
     @Inject(EF10_EXECUTOR)
     private readonly ef10Executor: ModuleExecutor,
+
+    @Inject(EF11_EXECUTOR)
+    private readonly ef11Executor: ModuleExecutor,
   ) {}
 
   onModuleInit(): void {
@@ -61,6 +65,7 @@ export class ExecutorRegistry implements OnModuleInit {
       this.ef08Executor,
       this.ef09Executor,
       this.ef10Executor,
+      this.ef11Executor,
     ].forEach((executor) => this.register(executor));
   }
 
